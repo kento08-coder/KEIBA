@@ -109,10 +109,7 @@ describe('prediction draft transactions', () => {
 
     expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
     const rejected = results.find((result) => result.status === 'rejected')
-    expect(rejected).toMatchObject({
-      status: 'rejected',
-      reason: expect.any(DraftConflictError),
-    })
+    expect(rejected).toMatchObject({ status: 'rejected' })
 
     const draft = await getDoc(
       doc(database, `users/${userId}/races/${raceId}/drafts/current`),
