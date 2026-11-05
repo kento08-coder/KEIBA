@@ -2,7 +2,9 @@
 
 競馬の予想・購入記録・結果分析を一貫して管理するための、個人向けWebアプリです。
 
-**Phase 0（開発基盤）** と **Phase 1 Milestone 1（データモデル・JSONスキーマ）** までを実装しています。画面上の成績・レース情報と`examples/`のJSONは検証用の架空サンプルであり、実在するレースや購入記録ではありません。画面からの予想JSON取り込み、購入プラン生成、実購入記録、結果分析は後続マイルストーンで実装します。
+**Phase 0（開発基盤）** と **Phase 1 Milestone 1〜2（データモデル・レース／予想管理）** までを実装しています。画面上の成績と`examples/`のJSONは検証用の架空サンプルであり、実在するレースや購入記録ではありません。期待値計算、購入プラン生成、実購入記録、結果分析は後続マイルストーンで実装します。
+
+Milestone 2では、レース登録、予想JSONのファイル／貼り付け取込、Zod検証プレビュー、詳細分析編集、下書き自動保存、競合検知、確定予想バージョン、差分表示を追加しています。既存下書きの置換前には差分と確認操作を表示し、最新確定版から予想内容が変わっていない再確定は拒否します。クラウド機能はGoogleログイン後に有効になります。
 
 ## 技術構成
 
@@ -96,6 +98,7 @@ npm run test:rules
 - 別UIDのデータ: 拒否
 - 未定義コレクションと `/users/{uid}` 以外: 拒否
 - 確定予想、確定購入、確定結果、取込ログ: 更新・削除を拒否
+- 予想下書き: `revision=1`から開始し、更新ごとに`+1`だけ許可。削除を拒否
 
 Firebase ConsoleでFirestoreを本番運用する前にRulesをデプロイしてください。フロントエンド上の表示制御はセキュリティ境界ではなく、Rulesが最終的な防御です。
 
@@ -136,11 +139,15 @@ Firebase Web設定値はクライアントへ配信される公開設定です�
 src/
   app/                       # ルーティングとアプリシェル
   components/                # 共通UI
-  domain/                    # 型、Zod検証、将来の純粋計算
+  domain/                    # 型、Zod検証、差分・ハッシュ用純粋処理
   features/auth/             # 認証コンテキストとUI
+  features/races/            # レースモデルとリアルタイム購読
+  features/predictions/      # 予想プレビューと編集UI
   infrastructure/firebase/  # Firebase初期化
-  pages/                     # Phase 0の画面骨格
+  infrastructure/repositories/ # Firestore transaction／購読境界
+  pages/                     # 画面とルーティング
 tests/domain/                # JSON検証テスト
+tests/ui/                    # JSON取込・画面テスト
 tests/rules/                 # Firestore Security Rulesテスト
 ```
 

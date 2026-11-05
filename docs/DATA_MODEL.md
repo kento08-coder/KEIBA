@@ -57,6 +57,8 @@
 
 確定予想の不変スナップショット。作成後のupdate/deleteはSecurity Rulesでも拒否する。
 
+確定transactionでは最新確定版と下書きの実質的な予想内容を比較する。`generated_at`と`change_reason`だけの変更は新しい予想内容とは扱わず、重複バージョンの作成を拒否する。展開、馬評価、馬券候補などが変更された場合だけ次のversionを作成する。
+
 | フィールド | 型 | 内容 |
 |---|---|---|
 | `versionNumber` | positive integer | レース内の連番 |
@@ -77,13 +79,13 @@
 | フィールド | 型 | 内容 |
 |---|---|---|
 | `baseVersionId` | string \| null | 編集元の確定版 |
-| `revision` | non-negative integer | 楽観ロック用リビジョン |
+| `revision` | positive integer | 楽観ロック用リビジョン。初回保存は1、以後1ずつ加算 |
 | `lastEditedAt` | Timestamp | 最終編集日時 |
 | `lastEditedByClient` | string | 端末・タブ識別子 |
 | `schemaVersion` | literal `1.0.0` | スキーマ版 |
 | `payload` | PredictionDocument | 編集中スナップショット |
 
-保存時はtransaction内で現在の`revision`を確認し、競合時に黙って上書きしない。
+保存時はtransaction内で現在の`revision`を確認し、競合時に黙って上書きしない。JSON取込時はプレビュー時点の`revision`を固定し、既存下書きとの差分と置換確認を表示する。確認中に別端末が更新した場合も古い`revision`として拒否する。Security Rulesでも初回`revision=1`と更新ごとの`+1`を要求し、下書きの削除を拒否する。
 
 ### 3.4 `/plans/{planId}`
 
