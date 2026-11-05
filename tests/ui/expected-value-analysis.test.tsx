@@ -18,6 +18,7 @@ describe('expected value analysis', () => {
     expect(screen.getAllByText(/未算出/).length).toBeGreaterThan(0)
     expect(screen.getAllByText(/不確実性/).length).toBeGreaterThan(0)
     expect(screen.getByText(/利益や的中を保証せず/)).toBeInTheDocument()
+    expect(screen.getAllByText(/観測時点のオッズ/).length).toBeGreaterThan(0)
     expect(screen.getByText(/各馬評価から確率を自動生成していません/)).toBeInTheDocument()
   })
 

@@ -99,7 +99,7 @@ function CandidateCard({ entry }: { entry: BetCandidateExpectedValue }) {
             </dd>
           </div>
           <div className="rounded-lg bg-navy-900 p-3">
-            <dt className="text-muted">オッズ / 優位幅</dt>
+            <dt className="text-muted">観測時点のオッズ / 優位幅</dt>
             <dd className="mt-1 font-semibold text-copy">
               {odds(entry.candidate.odds)} / {percent(metrics.probabilityEdge)}
             </dd>
@@ -115,7 +115,10 @@ function CandidateCard({ entry }: { entry: BetCandidateExpectedValue }) {
           確率の出所: {probabilitySourceLabels[entry.candidate.probability_source]}
           ・確信度: {entry.candidate.confidence}
         </p>
-        <p>オッズ観測: {entry.candidate.odds_observed_at ?? '未確認'}</p>
+        <p>
+          観測時点のオッズ日時:{' '}
+          {entry.candidate.odds_observed_at ?? '観測日時なし'}
+        </p>
         {isHighlyUncertain(entry) ? (
           <p className="font-bold text-amber-200">不確実性が高い推定です。</p>
         ) : null}
@@ -190,7 +193,7 @@ export function ExpectedValueAnalysis({
               <thead className="bg-navy-900 text-muted">
                 <tr>
                   <th className="px-3 py-3">券種・組合せ</th>
-                  <th className="px-3 py-3">オッズ</th>
+                  <th className="px-3 py-3">観測時点のオッズ</th>
                   <th className="px-3 py-3">推定確率</th>
                   <th className="px-3 py-3">損益分岐</th>
                   <th className="px-3 py-3">期待回収率</th>

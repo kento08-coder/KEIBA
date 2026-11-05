@@ -11,11 +11,13 @@ export const betTypeLabels: Record<BetType, string> = {
   trifecta: '三連単',
 }
 
+export const EXPECTED_RETURN_MULTIPLIER_TOLERANCE = 1e-12
+
 export type ExpectedValueClassification = 'positive' | 'break_even' | 'negative'
 export type ExpectedValueUnavailableReason =
   | 'missing_probability'
   | 'missing_odds'
-  | 'unconfirmed_odds'
+  | 'missing_odds_observation'
   | 'invalid_probability'
   | 'invalid_odds'
   | 'invalid_odds_range'
@@ -27,7 +29,8 @@ export const expectedValueUnavailableLabels: Record<
 > = {
   missing_probability: '推定的中確率が未設定です。',
   missing_odds: 'オッズが未設定です。',
-  unconfirmed_odds: 'オッズの観測日時がなく、未確認として扱います。',
+  missing_odds_observation:
+    'オッズが記録済みでも観測日時がないため、期待値を算出できません。',
   invalid_probability: '推定的中確率が0〜1の範囲外です。',
   invalid_odds: 'オッズが1.0未満、または有限値ではありません。',
   invalid_odds_range: 'オッズ範囲の上下限が不正です。',
@@ -49,7 +52,7 @@ export type ExpectedValueResult =
 
 export interface ExpectedValueInput {
   odds: number | null
-  oddsConfirmed: boolean
+  oddsObserved: boolean
   probability: number | null
   stakeYen: number
 }
@@ -80,19 +83,20 @@ export function calculateExpectedValue(
   if (!isFiniteNumber(input.odds) || input.odds < 1) {
     return { status: 'unavailable', reason: 'invalid_odds' }
   }
-  if (!input.oddsConfirmed) {
-    return { status: 'unavailable', reason: 'unconfirmed_odds' }
+  if (!input.oddsObserved) {
+    return { status: 'unavailable', reason: 'missing_odds_observation' }
   }
 
   const expectedReturnMultiplier = input.probability * input.odds
   const expectedPayoutYen = expectedReturnMultiplier * input.stakeYen
   const expectedNetProfitYen = expectedPayoutYen - input.stakeYen
+  const distanceFromBreakEven = expectedReturnMultiplier - 1
   const classification =
-    expectedNetProfitYen > 0
-      ? 'positive'
-      : expectedNetProfitYen < 0
-        ? 'negative'
-        : 'break_even'
+    Math.abs(distanceFromBreakEven) <= EXPECTED_RETURN_MULTIPLIER_TOLERANCE
+      ? 'break_even'
+      : distanceFromBreakEven > 0
+        ? 'positive'
+        : 'negative'
 
   return {
     status: 'calculated',
@@ -121,7 +125,7 @@ export type ExpectedValueRangeResult =
   | { status: 'unavailable'; reason: ExpectedValueUnavailableReason }
 
 export function calculateExpectedValueRange(input: {
-  oddsConfirmed: boolean
+  oddsObserved: boolean
   oddsRange: OddsRange | null
   probability: number | null
   stakeYen: number
@@ -140,7 +144,7 @@ export function calculateExpectedValueRange(input: {
 
   const lower = calculateExpectedValue({
     odds: input.oddsRange.lower,
-    oddsConfirmed: input.oddsConfirmed,
+    oddsObserved: input.oddsObserved,
     probability: input.probability,
     stakeYen: input.stakeYen,
   })
@@ -149,7 +153,7 @@ export function calculateExpectedValueRange(input: {
   }
   const upper = calculateExpectedValue({
     odds: input.oddsRange.upper,
-    oddsConfirmed: input.oddsConfirmed,
+    oddsObserved: input.oddsObserved,
     probability: input.probability,
     stakeYen: input.stakeYen,
   })
@@ -175,7 +179,7 @@ export function evaluateBetCandidate(
 ): ExpectedValueResult {
   return calculateExpectedValue({
     odds: candidate.odds,
-    oddsConfirmed:
+    oddsObserved:
       candidate.odds !== null && candidate.odds_observed_at !== null,
     probability: candidate.hit_probability,
     stakeYen,

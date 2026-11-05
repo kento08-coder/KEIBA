@@ -1,4 +1,5 @@
 import {
+  EXPECTED_RETURN_MULTIPLIER_TOLERANCE,
   calculateExpectedValue,
   calculateExpectedValueRange,
   evaluateBetCandidate,
@@ -42,7 +43,7 @@ describe('expected value calculation', () => {
   it('calculates the exact 100 percent break-even boundary', () => {
     const result = calculateExpectedValue({
       odds: 4,
-      oddsConfirmed: true,
+      oddsObserved: true,
       probability: 0.25,
       stakeYen: 100,
     })
@@ -69,7 +70,7 @@ describe('expected value calculation', () => {
     ({ probability, expectedProfit, classification }) => {
       const result = calculateExpectedValue({
         odds: 2,
-        oddsConfirmed: true,
+        oddsObserved: true,
         probability,
         stakeYen: 100,
       })
@@ -81,16 +82,93 @@ describe('expected value calculation', () => {
     },
   )
 
+  it.each([
+    {
+      classification: 'positive',
+      odds: 2.2,
+      probability: 0.5,
+    },
+    {
+      classification: 'break_even',
+      odds: 2,
+      probability: 0.5,
+    },
+    {
+      classification: 'negative',
+      odds: 1.8,
+      probability: 0.5,
+    },
+  ] as const)(
+    'classifies a zero-yen stake as $classification from its expected return multiplier',
+    ({ classification, odds, probability }) => {
+      const result = calculateExpectedValue({
+        odds,
+        oddsObserved: true,
+        probability,
+        stakeYen: 0,
+      })
+
+      expect(result.status).toBe('calculated')
+      if (result.status === 'calculated') {
+        expect(result.metrics.classification).toBe(classification)
+        expect(result.metrics.expectedNetProfitYen).toBe(0)
+      }
+    },
+  )
+
+  it('treats floating-point noise around 100 percent as break-even', () => {
+    const result = calculateExpectedValue({
+      odds: 10 / 3,
+      oddsObserved: true,
+      probability: 0.1 + 0.2,
+      stakeYen: 100,
+    })
+
+    expect(result.status).toBe('calculated')
+    if (result.status === 'calculated') {
+      expect(
+        Math.abs(result.metrics.expectedReturnRatePercent - 100),
+      ).toBeLessThanOrEqual(EXPECTED_RETURN_MULTIPLIER_TOLERANCE * 100)
+      expect(result.metrics.classification).toBe('break_even')
+    }
+  })
+
+  it.each([
+    {
+      classification: 'positive',
+      odds: 2 + EXPECTED_RETURN_MULTIPLIER_TOLERANCE * 4,
+    },
+    {
+      classification: 'negative',
+      odds: 2 - EXPECTED_RETURN_MULTIPLIER_TOLERANCE * 4,
+    },
+  ] as const)(
+    'classifies values beyond the tolerance as $classification',
+    ({ classification, odds }) => {
+      const result = calculateExpectedValue({
+        odds,
+        oddsObserved: true,
+        probability: 0.5,
+        stakeYen: 0,
+      })
+
+      expect(result).toMatchObject({
+        status: 'calculated',
+        metrics: { classification },
+      })
+    },
+  )
+
   it('distinguishes probability zero from an unset probability', () => {
     const zero = calculateExpectedValue({
       odds: 3,
-      oddsConfirmed: true,
+      oddsObserved: true,
       probability: 0,
       stakeYen: 100,
     })
     const unset = calculateExpectedValue({
       odds: 3,
-      oddsConfirmed: true,
+      oddsObserved: true,
       probability: null,
       stakeYen: 100,
     })
@@ -108,7 +186,7 @@ describe('expected value calculation', () => {
   it('supports probability one and odds 1.0', () => {
     const result = calculateExpectedValue({
       odds: 1,
-      oddsConfirmed: true,
+      oddsObserved: true,
       probability: 1,
       stakeYen: 500,
     })
@@ -127,7 +205,7 @@ describe('expected value calculation', () => {
   it.each([100, 500, 1_000])('calculates stake %i without early rounding', (stakeYen) => {
     const result = calculateExpectedValue({
       odds: 2.35,
-      oddsConfirmed: true,
+      oddsObserved: true,
       probability: 0.47,
       stakeYen,
     })
@@ -142,35 +220,35 @@ describe('expected value calculation', () => {
 
   it.each([
     {
-      input: { probability: null, odds: 2, oddsConfirmed: true, stakeYen: 100 },
+      input: { probability: null, odds: 2, oddsObserved: true, stakeYen: 100 },
       reason: 'missing_probability',
     },
     {
-      input: { probability: 0.5, odds: null, oddsConfirmed: false, stakeYen: 100 },
+      input: { probability: 0.5, odds: null, oddsObserved: false, stakeYen: 100 },
       reason: 'missing_odds',
     },
     {
-      input: { probability: 0.5, odds: 2, oddsConfirmed: false, stakeYen: 100 },
-      reason: 'unconfirmed_odds',
+      input: { probability: 0.5, odds: 2, oddsObserved: false, stakeYen: 100 },
+      reason: 'missing_odds_observation',
     },
     {
-      input: { probability: -0.1, odds: 2, oddsConfirmed: true, stakeYen: 100 },
+      input: { probability: -0.1, odds: 2, oddsObserved: true, stakeYen: 100 },
       reason: 'invalid_probability',
     },
     {
-      input: { probability: 1.1, odds: 2, oddsConfirmed: true, stakeYen: 100 },
+      input: { probability: 1.1, odds: 2, oddsObserved: true, stakeYen: 100 },
       reason: 'invalid_probability',
     },
     {
-      input: { probability: 0.5, odds: 0.99, oddsConfirmed: true, stakeYen: 100 },
+      input: { probability: 0.5, odds: 0.99, oddsObserved: true, stakeYen: 100 },
       reason: 'invalid_odds',
     },
     {
-      input: { probability: 0.5, odds: Number.NaN, oddsConfirmed: true, stakeYen: 100 },
+      input: { probability: 0.5, odds: Number.NaN, oddsObserved: true, stakeYen: 100 },
       reason: 'invalid_odds',
     },
     {
-      input: { probability: 0.5, odds: 2, oddsConfirmed: true, stakeYen: -1 },
+      input: { probability: 0.5, odds: 2, oddsObserved: true, stakeYen: -1 },
       reason: 'invalid_stake',
     },
   ] as const)('rejects unavailable or invalid input: $reason', ({ input, reason }) => {
@@ -182,7 +260,7 @@ describe('expected value calculation', () => {
 
   it('keeps odds ranges as lower and upper calculations', () => {
     const result = calculateExpectedValueRange({
-      oddsConfirmed: true,
+      oddsObserved: true,
       oddsRange: { lower: 1.8, upper: 2.4 },
       probability: 0.5,
       stakeYen: 100,
