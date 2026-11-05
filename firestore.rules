@@ -10,6 +10,11 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isFinalPredictionVersion(userId, raceId, versionId) {
+      return exists(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/predictionVersions/$(versionId))
+        && get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/predictionVersions/$(versionId)).data.status == 'final';
+    }
+
     match /users/{userId} {
       allow read, write: if isOwner(userId);
     }
@@ -59,7 +64,18 @@ service cloud.firestore {
     }
 
     match /users/{userId}/races/{raceId}/plans/{planId} {
-      allow read, create: if isOwner(userId);
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && request.resource.data.planId == planId
+        && request.resource.data.authorUid == userId
+        && request.resource.data.isSimulation == true
+        && request.resource.data.budgetYen is int
+        && request.resource.data.budgetYen >= 0
+        && request.resource.data.sourcePredictionVersionId is string
+        && isFinalPredictionVersion(userId, raceId, request.resource.data.sourcePredictionVersionId)
+        && request.resource.data.strategy in ['expected_value', 'fractional_kelly', 'loss_control']
+        && request.resource.data.algorithmVersion is string
+        && request.resource.data.createdAt == request.time;
       allow update, delete: if false;
     }
 

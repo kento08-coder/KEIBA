@@ -12,10 +12,15 @@ import {
   hashPredictionDocument,
   hasSamePredictionContent,
 } from '../../domain/prediction-utils'
+import {
+  validatePurchasePlanWriteData,
+  type PurchasePlanWriteData,
+} from '../../domain/calculations/purchase-plan'
 import type {
   ImportLogRecord,
   PredictionDraftRecord,
   PredictionVersionRecord,
+  PurchasePlanRecord,
   RaceRecord,
 } from '../../domain/types/firestore'
 import type { PredictionDocument } from '../../domain/types/import'
@@ -30,12 +35,14 @@ import { firestore } from '../firebase/client'
 type FirestoreRace = RaceRecord<Timestamp | null>
 type FirestoreDraft = PredictionDraftRecord<Timestamp | null>
 type FirestoreVersion = PredictionVersionRecord<Timestamp | null>
+type FirestorePurchasePlan = PurchasePlanRecord<Timestamp | null>
 
 export class RepositoryError extends Error {}
 export class DuplicateRaceError extends RepositoryError {}
 export class DuplicateImportError extends RepositoryError {}
 export class DuplicatePredictionVersionError extends RepositoryError {}
 export class DraftConflictError extends RepositoryError {}
+export class DuplicatePurchasePlanError extends RepositoryError {}
 
 function requireFirestore(database?: Firestore): Firestore {
   const configuredFirestore = database ?? firestore
@@ -134,6 +141,29 @@ export function subscribePredictionVersion(
           ? { id: snapshot.id, ...(snapshot.data() as FirestoreVersion) }
           : null,
       ),
+    onError,
+  )
+}
+
+export function subscribePurchasePlans(
+  userId: string,
+  raceId: string,
+  onData: (plans: FirestorePurchasePlan[]) => void,
+  onError: (error: Error) => void,
+): Unsubscribe {
+  const db = requireFirestore()
+  return onSnapshot(
+    collection(db, ...userRacePath(userId, raceId), 'plans'),
+    (snapshot) => {
+      const plans = snapshot.docs
+        .map((entry) => entry.data() as FirestorePurchasePlan)
+        .sort((left, right) => {
+          const leftMillis = left.createdAt?.toMillis?.() ?? 0
+          const rightMillis = right.createdAt?.toMillis?.() ?? 0
+          return rightMillis - leftMillis || left.planId.localeCompare(right.planId)
+        })
+      onData(plans)
+    },
     onError,
   )
 }
@@ -391,4 +421,58 @@ export async function finalizePrediction(input: {
 
     return { contentHash, revision: nextRevision, versionId: versionRef.id, versionNumber }
   })
+}
+
+export async function savePurchasePlan(input: {
+  data: PurchasePlanWriteData
+  database?: Firestore
+  raceId: string
+  userId: string
+}) {
+  const db = requireFirestore(input.database)
+  if (input.data.authorUid !== input.userId) {
+    throw new RepositoryError('保存ユーザーとプラン作成者が一致しません。')
+  }
+  const validationIssues = validatePurchasePlanWriteData(input.data)
+  if (validationIssues.length > 0) {
+    throw new RepositoryError(validationIssues.join(' '))
+  }
+
+  const planRef = doc(
+    db,
+    ...userRacePath(input.userId, input.raceId),
+    'plans',
+    input.data.planId,
+  )
+  const versionRef = doc(
+    db,
+    ...userRacePath(input.userId, input.raceId),
+    'predictionVersions',
+    input.data.sourcePredictionVersionId,
+  )
+
+  await runTransaction(db, async (transaction) => {
+    const [planSnapshot, versionSnapshot] = await Promise.all([
+      transaction.get(planRef),
+      transaction.get(versionRef),
+    ])
+    if (planSnapshot.exists()) {
+      throw new DuplicatePurchasePlanError(
+        'この購入プランは既に保存されています。保存済み一覧を確認してください。',
+      )
+    }
+    if (!versionSnapshot.exists()) {
+      throw new RepositoryError('元の確定予想バージョンが見つかりません。')
+    }
+    const version = versionSnapshot.data() as FirestoreVersion
+    if (version.status !== 'final') {
+      throw new RepositoryError('確定予想以外から購入プランを保存できません。')
+    }
+    transaction.set(planRef, {
+      ...input.data,
+      createdAt: serverTimestamp(),
+    })
+  })
+
+  return input.data.planId
 }

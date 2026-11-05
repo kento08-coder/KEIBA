@@ -6,7 +6,14 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing'
-import { deleteDoc, doc, getDoc, setDoc, updateDoc } from 'firebase/firestore'
+import {
+  deleteDoc,
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+} from 'firebase/firestore'
 
 const projectId = 'keiba-rules-test'
 let testEnvironment: RulesTestEnvironment
@@ -97,6 +104,109 @@ describe('Firestore ownership rules', () => {
     )
     await assertFails(
       setDoc(otherAuthorRef, { authorUid: 'owner-b', status: 'final' }),
+    )
+  })
+
+  it('allows owners to create and read plans but keeps them immutable and isolated', async () => {
+    const ownerDb = testEnvironment.authenticatedContext('owner-a').firestore()
+    const intruderDb = testEnvironment.authenticatedContext('owner-b').firestore()
+    const anonymousDb = testEnvironment.unauthenticatedContext().firestore()
+    const ownerPlanRef = doc(
+      ownerDb,
+      'users/owner-a/races/race-1/plans/plan-1',
+    )
+    const intruderPlanRef = doc(
+      intruderDb,
+      'users/owner-a/races/race-1/plans/plan-1',
+    )
+    const anonymousPlanRef = doc(
+      anonymousDb,
+      'users/owner-a/races/race-1/plans/plan-1',
+    )
+    const sourceVersionRef = doc(
+      ownerDb,
+      'users/owner-a/races/race-1/predictionVersions/version-1',
+    )
+
+    await assertSucceeds(
+      setDoc(sourceVersionRef, { authorUid: 'owner-a', status: 'final' }),
+    )
+    await assertSucceeds(
+      setDoc(ownerPlanRef, {
+        algorithmVersion: 'phase1-m4-v1',
+        authorUid: 'owner-a',
+        budgetYen: 1_000,
+        createdAt: serverTimestamp(),
+        isSimulation: true,
+        planId: 'plan-1',
+        sourcePredictionVersionId: 'version-1',
+        strategy: 'expected_value',
+      }),
+    )
+    await assertSucceeds(getDoc(ownerPlanRef))
+    await assertFails(updateDoc(ownerPlanRef, { budgetYen: 2_000 }))
+    await assertFails(deleteDoc(ownerPlanRef))
+    await assertFails(getDoc(intruderPlanRef))
+    await assertFails(setDoc(intruderPlanRef, { planId: 'intruder' }))
+    await assertFails(getDoc(anonymousPlanRef))
+  })
+
+  it('rejects a plan with a mismatched id or author', async () => {
+    const ownerDb = testEnvironment.authenticatedContext('owner-a').firestore()
+    const sourceVersionRef = doc(
+      ownerDb,
+      'users/owner-a/races/race-1/predictionVersions/version-1',
+    )
+    const planRef = doc(
+      ownerDb,
+      'users/owner-a/races/race-1/plans/plan-1',
+    )
+    const validBase = {
+      algorithmVersion: 'phase1-m4-v1',
+      budgetYen: 1_000,
+      createdAt: serverTimestamp(),
+      isSimulation: true,
+      sourcePredictionVersionId: 'version-1',
+      strategy: 'expected_value',
+    }
+
+    await assertSucceeds(
+      setDoc(sourceVersionRef, { authorUid: 'owner-a', status: 'final' }),
+    )
+    await assertFails(
+      setDoc(planRef, {
+        ...validBase,
+        authorUid: 'owner-a',
+        planId: 'different-plan',
+      }),
+    )
+    await assertFails(
+      setDoc(planRef, {
+        ...validBase,
+        authorUid: 'owner-b',
+        planId: 'plan-1',
+      }),
+    )
+  })
+
+  it('rejects a plan that is not linked to an existing final prediction version', async () => {
+    const ownerDb = testEnvironment.authenticatedContext('owner-a').firestore()
+    const planRef = doc(
+      ownerDb,
+      'users/owner-a/races/race-1/plans/plan-1',
+    )
+
+    await assertFails(
+      setDoc(planRef, {
+        algorithmVersion: 'phase1-m4-v1',
+        authorUid: 'owner-a',
+        budgetYen: 1_000,
+        createdAt: serverTimestamp(),
+        isSimulation: true,
+        planId: 'plan-1',
+        sourcePredictionVersionId: 'missing-version',
+        strategy: 'expected_value',
+      }),
     )
   })
 

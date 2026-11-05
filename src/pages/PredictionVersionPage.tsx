@@ -1,4 +1,4 @@
-import { ArrowLeft, GitCompare, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, GitCompare, ShieldCheck, WalletCards } from 'lucide-react'
 import { lazy, Suspense } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { StatusNotice } from '../components/StatusNotice'
@@ -63,6 +63,12 @@ export function PredictionVersionPage() {
           <span className="inline-flex items-center gap-2 rounded-full bg-teal-accent/10 px-3 py-1.5 text-xs font-bold text-teal-accent"><ShieldCheck size={15} /> 確定後は変更不可</span>
         </div>
         <p className="mt-4 break-all font-mono text-xs text-muted">SHA-256: {version.value.contentHash}</p>
+        <Link
+          className="button-primary mt-5"
+          to={`/races/${id}/plans?versionId=${version.value.id}`}
+        >
+          <WalletCards size={17} /> 購入プランを作成
+        </Link>
       </section>
 
       <Suspense fallback={<StatusNotice>期待値を計算しています…</StatusNotice>}>

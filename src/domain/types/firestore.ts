@@ -1,4 +1,5 @@
 import type { PredictionDocument, ResultDocument } from './import'
+import type { PurchasePlanSnapshot } from './purchase-plan'
 
 export type IsoDateTimeString = string
 export type RaceStatus =
@@ -64,3 +65,6 @@ export interface ImportLogRecord<TTimestamp = IsoDateTimeString> {
   sourceFileName: string | null
   targetId: string
 }
+
+export type PurchasePlanRecord<TTimestamp = IsoDateTimeString> =
+  PurchasePlanSnapshot<TTimestamp>

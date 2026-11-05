@@ -89,19 +89,26 @@
 
 ### 3.4 `/plans/{planId}`
 
-購入提案のスナップショット。Milestone 4で実装する。
+購入提案の不変スナップショット。Milestone 4で実装する。
 
-- `sourcePredictionVersionId`
-- `strategy`: `expected_value` / `fractional_kelly` / `loss_control`
-- `budgetYen`
-- `candidateSnapshot`
-- `allocations`
-- `algorithmVersion`
-- `assumptions`
-- `createdAt`
-- `isSimulation`
+| フィールド | 型 | 内容 |
+|---|---|---|
+| `planId` | string | ドキュメントIDと同値。再試行時の重複保存防止キー |
+| `sourcePredictionVersionId` | string | 元の確定予想バージョンID |
+| `name` / `memo` | string | ユーザーが編集した名称とメモ |
+| `strategy` | enum | `expected_value` / `fractional_kelly` / `loss_control` |
+| `budgetYen` | non-negative integer | 設定予算 |
+| `settings` | map | 点数上限、1点上限、券種指定、ケリー係数、損失抑制使用率 |
+| `candidateSnapshot` | array | 使用候補の確率・オッズ・観測日時・確信度・根拠 |
+| `allocations` | array | 候補ID、100円単位の購入額、期待値計算結果 |
+| `summary` | map | 使用額、未使用額、期待利益線形和、全不的中時損失額 |
+| `algorithmVersion` | string | 初期版は`phase1-m4-v1` |
+| `assumptions` / `warnings` | string[] | 相関・推定値・計算前提 |
+| `authorUid` | string | 保存したユーザーUID |
+| `createdAt` | Timestamp | サーバー保存日時 |
+| `isSimulation` | literal `true` | 実購入ではない提案であることを明示 |
 
-提案確定後は編集せず、再計算時は別IDで作成する。
+保存transactionで元の確定予想の存在と同一`planId`の未保存を確認する。Security Rulesでも所有UID、ドキュメントIDと`planId`の一致、元の確定予想の存在、提案フラグ、戦略、予算、サーバー保存日時を検証する。提案確定後は編集せず、再計算・手動調整後の再保存は別IDで作成する。元予想やオッズが後で変更されても`candidateSnapshot`と計算結果は書き換えない。
 
 ### 3.5 `/purchases/{purchaseId}`
 
