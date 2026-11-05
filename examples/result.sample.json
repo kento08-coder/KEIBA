@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0.0",
+  "document_type": "result",
+  "race_id": "2026-11-08-TOKYO-11-JRA",
+  "generated_at": "2026-11-08T17:00:00+09:00",
+  "source_agent": "codex-sample",
+  "sources": [
+    {
+      "id": "sample-official-result",
+      "url": "https://example.invalid/sample-official-result",
+      "title": "架空の公式結果サンプル",
+      "checked_at": "2026-11-08T16:55:00+09:00",
+      "note": "テスト専用の架空資料"
+    }
+  ],
+  "notes": "この結果はスキーマ検証用の架空サンプルです。実在するレース・競走馬・払戻ではありません。",
+  "result_status": "confirmed",
+  "finishers": [
+    { "horse_number": 2, "frame_number": 1, "rank": 1, "status": "finished" },
+    { "horse_number": 7, "frame_number": 1, "rank": 2, "status": "finished" },
+    { "horse_number": 10, "frame_number": 6, "rank": 3, "status": "finished" },
+    { "horse_number": 1, "frame_number": 8, "rank": 4, "status": "finished" }
+  ],
+  "payouts": [
+    { "bet_type": "win", "horse_numbers": [2], "payout_type": "payout", "payout_per_100_yen": 480, "official_confirmed": true, "source_refs": ["sample-official-result"] },
+    { "bet_type": "quinella", "horse_numbers": [2, 7], "payout_type": "payout", "payout_per_100_yen": 850, "official_confirmed": true, "source_refs": ["sample-official-result"] },
+    { "bet_type": "exacta", "horse_numbers": [2, 7], "payout_type": "payout", "payout_per_100_yen": 1840, "official_confirmed": true, "source_refs": ["sample-official-result"] },
+    { "bet_type": "trio", "horse_numbers": [2, 7, 10], "payout_type": "payout", "payout_per_100_yen": 2200, "official_confirmed": true, "source_refs": ["sample-official-result"] },
+    { "bet_type": "trifecta", "horse_numbers": [2, 7, 10], "payout_type": "payout", "payout_per_100_yen": 11400, "official_confirmed": true, "source_refs": ["sample-official-result"] }
+  ],
+  "observed_pace": {
+    "label": "middle",
+    "basis": "架空のラップと通過順に基づく検証済みサンプル。",
+    "verified": true,
+    "passing_orders": [
+      { "checkpoint": "1corner", "horse_numbers": [2, 7, 1, 10] },
+      { "checkpoint": "4corner", "horse_numbers": [2, 7, 10, 1] },
+      { "checkpoint": "finish", "horse_numbers": [2, 7, 10, 1] }
+    ]
+  },
+  "interpretation": {
+    "race_shape": "ミドルペースから先行馬が粘ったという架空の解釈。",
+    "confidence": "low"
+  },
+  "change_reason": "スキーマ検証用の初回確定結果"
+}

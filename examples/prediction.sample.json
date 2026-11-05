@@ -1,0 +1,160 @@
+{
+  "schema_version": "1.0.0",
+  "document_type": "prediction",
+  "race_id": "2026-11-08-TOKYO-11-JRA",
+  "generated_at": "2026-11-08T12:00:00+09:00",
+  "source_agent": "codex-sample",
+  "sources": [
+    {
+      "id": "sample-race-card",
+      "url": "https://example.invalid/sample-race-card",
+      "title": "架空の出馬表サンプル",
+      "checked_at": "2026-11-08T11:50:00+09:00",
+      "note": "テスト専用の架空資料"
+    },
+    {
+      "id": "sample-odds",
+      "url": "https://example.invalid/sample-odds",
+      "title": "架空のオッズサンプル",
+      "checked_at": "2026-11-08T12:00:00+09:00",
+      "note": "テスト専用の架空資料"
+    }
+  ],
+  "notes": "このデータはスキーマ検証用の架空サンプルです。実在するレース・競走馬・オッズ・予測ではありません。",
+  "race": {
+    "date": "2026-11-08",
+    "organizer": "JRA",
+    "venue_code": "TOKYO",
+    "race_number": 11,
+    "name": "サンプルステークス",
+    "surface": "turf",
+    "distance_m": 2000,
+    "track_condition": "good",
+    "weather": "cloudy",
+    "start_at": "2026-11-08T15:30:00+09:00"
+  },
+  "scenarios": [
+    {
+      "id": "slow",
+      "label": "スロー",
+      "pace": "slow",
+      "probability": 0.25,
+      "projected_order": [
+        { "horse_number": 2, "position_group": "front" },
+        { "horse_number": 7, "position_group": "stalker" },
+        { "horse_number": 1, "position_group": "midfield" },
+        { "horse_number": 10, "position_group": "closer" }
+      ],
+      "favored_styles": ["front", "stalker"],
+      "reason": "架空の先行馬が少ないというサンプル仮定。",
+      "confidence": "low"
+    },
+    {
+      "id": "middle",
+      "label": "ミドル",
+      "pace": "middle",
+      "probability": 0.5,
+      "projected_order": [
+        { "horse_number": 2, "position_group": "front" },
+        { "horse_number": 7, "position_group": "stalker" },
+        { "horse_number": 1, "position_group": "midfield" },
+        { "horse_number": 10, "position_group": "closer" }
+      ],
+      "favored_styles": ["stalker", "midfield"],
+      "reason": "平均的な流れになるという架空のサンプル仮定。",
+      "confidence": "low"
+    },
+    {
+      "id": "high",
+      "label": "ハイ",
+      "pace": "high",
+      "probability": 0.25,
+      "projected_order": [
+        { "horse_number": 2, "position_group": "front" },
+        { "horse_number": 7, "position_group": "midfield" },
+        { "horse_number": 1, "position_group": "midfield" },
+        { "horse_number": 10, "position_group": "closer" }
+      ],
+      "favored_styles": ["closer"],
+      "reason": "架空の競り合いが起きる場合のサンプル仮定。",
+      "confidence": "low"
+    }
+  ],
+  "horses": [
+    {
+      "horse_number": 1,
+      "frame_number": 1,
+      "name": "仮想馬A",
+      "running_style": "midfield",
+      "past_performance": "架空の過去実績A。",
+      "form": "average",
+      "track_suitability": "neutral",
+      "distance_suitability": "suitable",
+      "scenario_assessments": { "slow": "neutral", "middle": "advantage", "high": "neutral" },
+      "probabilities": { "win": 0.14, "top2": 0.29, "top3": 0.44 },
+      "probability_source": "ai_estimate",
+      "rationale": "中団から運べるという架空評価。",
+      "confidence": "low",
+      "source_refs": ["sample-race-card"]
+    },
+    {
+      "horse_number": 2,
+      "frame_number": 2,
+      "name": "仮想馬B",
+      "running_style": "front",
+      "past_performance": "架空の過去実績B。",
+      "form": "good",
+      "track_suitability": "suitable",
+      "distance_suitability": "suitable",
+      "scenario_assessments": { "slow": "advantage", "middle": "neutral", "high": "disadvantage" },
+      "probabilities": { "win": 0.22, "top2": 0.4, "top3": 0.55 },
+      "probability_source": "ai_estimate",
+      "rationale": "先行力があるという架空評価。",
+      "confidence": "low",
+      "source_refs": ["sample-race-card"]
+    },
+    {
+      "horse_number": 7,
+      "frame_number": 4,
+      "name": "仮想馬C",
+      "running_style": "stalker",
+      "past_performance": "架空の過去実績C。",
+      "form": "good",
+      "track_suitability": "strong",
+      "distance_suitability": "neutral",
+      "scenario_assessments": { "slow": "advantage", "middle": "advantage", "high": "neutral" },
+      "probabilities": { "win": 0.2, "top2": 0.38, "top3": 0.52 },
+      "probability_source": "ai_estimate",
+      "rationale": "好位で対応できるという架空評価。",
+      "confidence": "low",
+      "source_refs": ["sample-race-card"]
+    },
+    {
+      "horse_number": 10,
+      "frame_number": 6,
+      "name": "仮想馬D",
+      "running_style": "closer",
+      "past_performance": "架空の過去実績D。",
+      "form": "average",
+      "track_suitability": "neutral",
+      "distance_suitability": "strong",
+      "scenario_assessments": { "slow": "disadvantage", "middle": "neutral", "high": "advantage" },
+      "probabilities": { "win": 0.16, "top2": 0.31, "top3": 0.47 },
+      "probability_source": "ai_estimate",
+      "rationale": "流れが速い場合に届くという架空評価。",
+      "confidence": "low",
+      "source_refs": ["sample-race-card"]
+    }
+  ],
+  "bet_candidates": [
+    { "id": "b-win", "bet_type": "win", "horse_numbers": [2], "odds": 4.8, "odds_observed_at": "2026-11-08T12:00:00+09:00", "hit_probability": 0.22, "probability_source": "ai_estimate", "rationale": "架空の単勝候補。", "confidence": "low", "source_refs": ["sample-odds"] },
+    { "id": "b-place", "bet_type": "place", "horse_numbers": [7], "odds": 2.1, "odds_observed_at": "2026-11-08T12:00:00+09:00", "hit_probability": 0.52, "probability_source": "ai_estimate", "rationale": "架空の複勝候補。", "confidence": "low", "source_refs": ["sample-odds"] },
+    { "id": "b-bracket", "bet_type": "bracket_quinella", "horse_numbers": [1, 2], "odds": 7.2, "odds_observed_at": "2026-11-08T12:00:00+09:00", "hit_probability": 0.13, "probability_source": "ai_estimate", "rationale": "架空の枠連候補。", "confidence": "low", "source_refs": ["sample-odds"] },
+    { "id": "b-quinella", "bet_type": "quinella", "horse_numbers": [2, 7], "odds": 8.5, "odds_observed_at": "2026-11-08T12:00:00+09:00", "hit_probability": 0.16, "probability_source": "ai_estimate", "rationale": "架空の馬連候補。", "confidence": "low", "source_refs": ["sample-odds"] },
+    { "id": "b-wide", "bet_type": "wide", "horse_numbers": [2, 10], "odds": 5.3, "odds_observed_at": "2026-11-08T12:00:00+09:00", "hit_probability": 0.2, "probability_source": "ai_estimate", "rationale": "架空のワイド候補。", "confidence": "low", "source_refs": ["sample-odds"] },
+    { "id": "b-exacta", "bet_type": "exacta", "horse_numbers": [2, 7], "odds": 18.4, "odds_observed_at": "2026-11-08T12:00:00+09:00", "hit_probability": 0.07, "probability_source": "ai_estimate", "rationale": "架空の馬単候補。", "confidence": "low", "source_refs": ["sample-odds"] },
+    { "id": "b-trio", "bet_type": "trio", "horse_numbers": [2, 7, 10], "odds": 22.0, "odds_observed_at": "2026-11-08T12:00:00+09:00", "hit_probability": null, "probability_source": "unset", "rationale": "確率未設定の架空三連複候補。", "confidence": "unknown", "source_refs": ["sample-odds"] },
+    { "id": "b-trifecta", "bet_type": "trifecta", "horse_numbers": [2, 7, 10], "odds": null, "odds_observed_at": null, "hit_probability": null, "probability_source": "unset", "rationale": "オッズ・確率未設定の架空三連単候補。", "confidence": "unknown" }
+  ],
+  "change_reason": "スキーマ検証用の初期予想"
+}

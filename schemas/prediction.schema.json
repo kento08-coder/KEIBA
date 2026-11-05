@@ -1,0 +1,578 @@
+{
+  "$id": "https://kento08-coder.github.io/KEIBA/schemas/prediction.schema.json",
+  "title": "KEIBA Prediction Import Document v1",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "race_id": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}-[A-Z0-9_]+-\\d{2}-[A-Z0-9_]+$"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+    },
+    "source_agent": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80
+    },
+    "sources": {
+      "maxItems": 100,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+          },
+          "note": {
+            "type": "string",
+            "maxLength": 500
+          }
+        },
+        "required": [
+          "url",
+          "title",
+          "checked_at"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 2000
+    },
+    "document_type": {
+      "type": "string",
+      "const": "prediction"
+    },
+    "race": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "organizer": {
+          "type": "string",
+          "maxLength": 20,
+          "pattern": "^[A-Z0-9_]+$"
+        },
+        "venue_code": {
+          "type": "string",
+          "maxLength": 30,
+          "pattern": "^[A-Z0-9_]+$"
+        },
+        "race_number": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 99
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "surface": {
+          "type": "string",
+          "enum": [
+            "turf",
+            "dirt",
+            "obstacle",
+            "other",
+            "unknown"
+          ]
+        },
+        "distance_m": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 20000
+        },
+        "track_condition": {
+          "type": "string",
+          "enum": [
+            "firm",
+            "good",
+            "yielding",
+            "soft",
+            "heavy",
+            "unknown",
+            "other"
+          ]
+        },
+        "weather": {
+          "type": "string",
+          "enum": [
+            "sunny",
+            "cloudy",
+            "rainy",
+            "snowy",
+            "unknown",
+            "other"
+          ]
+        },
+        "start_at": {
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        }
+      },
+      "required": [
+        "date",
+        "organizer",
+        "venue_code",
+        "race_number",
+        "name",
+        "surface",
+        "distance_m",
+        "track_condition",
+        "weather"
+      ],
+      "additionalProperties": false
+    },
+    "scenarios": {
+      "minItems": 1,
+      "maxItems": 20,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 50,
+            "pattern": "^[a-z0-9_-]+$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "pace": {
+            "type": "string",
+            "enum": [
+              "slow",
+              "middle",
+              "high",
+              "unknown",
+              "other"
+            ]
+          },
+          "probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "projected_order": {
+            "maxItems": 99,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "horse_number": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 99
+                },
+                "position_group": {
+                  "type": "string",
+                  "enum": [
+                    "front",
+                    "stalker",
+                    "midfield",
+                    "closer",
+                    "unknown"
+                  ]
+                },
+                "note": {
+                  "type": "string",
+                  "maxLength": 300
+                }
+              },
+              "required": [
+                "horse_number",
+                "position_group"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "favored_styles": {
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "front",
+                "stalker",
+                "midfield",
+                "closer",
+                "unknown"
+              ]
+            }
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              "unknown"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "pace",
+          "probability",
+          "projected_order",
+          "favored_styles",
+          "reason",
+          "confidence"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "horses": {
+      "minItems": 1,
+      "maxItems": 99,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "horse_number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 99
+          },
+          "frame_number": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "running_style": {
+            "type": "string",
+            "enum": [
+              "front",
+              "stalker",
+              "midfield",
+              "closer",
+              "unknown"
+            ]
+          },
+          "past_performance": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "form": {
+            "type": "string",
+            "enum": [
+              "excellent",
+              "good",
+              "average",
+              "poor",
+              "unknown"
+            ]
+          },
+          "track_suitability": {
+            "type": "string",
+            "enum": [
+              "strong",
+              "suitable",
+              "neutral",
+              "unsuitable",
+              "unknown"
+            ]
+          },
+          "distance_suitability": {
+            "type": "string",
+            "enum": [
+              "strong",
+              "suitable",
+              "neutral",
+              "unsuitable",
+              "unknown"
+            ]
+          },
+          "scenario_assessments": {
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "enum": [
+                "advantage",
+                "neutral",
+                "disadvantage",
+                "unknown"
+              ]
+            }
+          },
+          "probabilities": {
+            "type": "object",
+            "properties": {
+              "win": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "top2": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "top3": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "win",
+              "top2",
+              "top3"
+            ],
+            "additionalProperties": false
+          },
+          "probability_source": {
+            "type": "string",
+            "enum": [
+              "ai_estimate",
+              "user_estimate",
+              "model_estimate",
+              "unset"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              "unknown"
+            ]
+          },
+          "source_refs": {
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        },
+        "required": [
+          "horse_number",
+          "frame_number",
+          "name",
+          "running_style",
+          "past_performance",
+          "form",
+          "track_suitability",
+          "distance_suitability",
+          "scenario_assessments",
+          "probabilities",
+          "rationale",
+          "confidence"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bet_candidates": {
+      "maxItems": 1000,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80,
+            "pattern": "^[A-Za-z0-9_-]+$"
+          },
+          "bet_type": {
+            "type": "string",
+            "enum": [
+              "win",
+              "place",
+              "bracket_quinella",
+              "quinella",
+              "wide",
+              "exacta",
+              "trio",
+              "trifecta"
+            ]
+          },
+          "horse_numbers": {
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 99
+            }
+          },
+          "odds": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "odds_observed_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time",
+                "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "hit_probability": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "probability_source": {
+            "type": "string",
+            "enum": [
+              "ai_estimate",
+              "user_estimate",
+              "model_estimate",
+              "unset"
+            ]
+          },
+          "rationale": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low",
+              "unknown"
+            ]
+          },
+          "source_refs": {
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        },
+        "required": [
+          "id",
+          "bet_type",
+          "horse_numbers",
+          "odds",
+          "odds_observed_at",
+          "hit_probability",
+          "probability_source",
+          "rationale",
+          "confidence"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "change_reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 500
+    }
+  },
+  "required": [
+    "schema_version",
+    "race_id",
+    "generated_at",
+    "source_agent",
+    "sources",
+    "document_type",
+    "race",
+    "scenarios",
+    "horses",
+    "bet_candidates",
+    "change_reason"
+  ],
+  "additionalProperties": false
+}

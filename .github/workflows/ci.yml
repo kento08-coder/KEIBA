@@ -30,6 +30,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Verify generated JSON Schemas
+        run: npm run generate:schemas && git diff --exit-code -- schemas
+
       - name: Lint
         run: npm run lint
 

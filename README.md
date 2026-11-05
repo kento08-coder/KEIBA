@@ -2,7 +2,7 @@
 
 競馬の予想・購入記録・結果分析を一貫して管理するための、個人向けWebアプリです。
 
-現在は **Phase 0（開発基盤）** までを実装しています。画面上の成績・レース情報はUI確認用のサンプルであり、実在するレースや購入記録ではありません。予想JSONの取り込み、購入プラン生成、実購入記録、結果分析はPhase 1以降で実装します。
+**Phase 0（開発基盤）** と **Phase 1 Milestone 1（データモデル・JSONスキーマ）** までを実装しています。画面上の成績・レース情報と`examples/`のJSONは検証用の架空サンプルであり、実在するレースや購入記録ではありません。画面からの予想JSON取り込み、購入プラン生成、実購入記録、結果分析は後続マイルストーンで実装します。
 
 ## 技術構成
 
@@ -76,6 +76,12 @@ npm run test
 npm run build
 ```
 
+Zodスキーマから外部ツール向けJSON Schemaを再生成する場合は、次を実行します。
+
+```bash
+npm run generate:schemas
+```
+
 Firestore RulesのテストはEmulatorを自動起動して実行します。
 
 ```bash
@@ -84,11 +90,12 @@ npm run test:rules
 
 ## Firestoreのアクセス制御
 
-`firestore.rules` は、認証済みユーザーが自分自身の `/users/{uid}/**` のみ読み書きできる構成です。
+`firestore.rules` は、認証済みユーザーが自分自身の `/users/{uid}` 配下にある既知のコレクションだけへアクセスできる構成です。
 
 - 未認証アクセス: 拒否
 - 別UIDのデータ: 拒否
-- `/users/{uid}` 以外: 拒否
+- 未定義コレクションと `/users/{uid}` 以外: 拒否
+- 確定予想、確定購入、確定結果、取込ログ: 更新・削除を拒否
 
 Firebase ConsoleでFirestoreを本番運用する前にRulesをデプロイしてください。フロントエンド上の表示制御はセキュリティ境界ではなく、Rulesが最終的な防御です。
 
@@ -116,6 +123,7 @@ Firebase Web設定値はクライアントへ配信される公開設定です�
 |---|---|
 | `npm run dev` | 開発サーバーを起動 |
 | `npm run lint` | ESLintを実行 |
+| `npm run generate:schemas` | ZodからJSON Schemaを生成 |
 | `npm run typecheck` | TypeScript型チェック |
 | `npm run test` | UIユニットテストを実行 |
 | `npm run test:rules` | Firestore RulesテストをEmulatorで実行 |
@@ -128,10 +136,20 @@ Firebase Web設定値はクライアントへ配信される公開設定です�
 src/
   app/                       # ルーティングとアプリシェル
   components/                # 共通UI
+  domain/                    # 型、Zod検証、将来の純粋計算
   features/auth/             # 認証コンテキストとUI
   infrastructure/firebase/  # Firebase初期化
   pages/                     # Phase 0の画面骨格
+tests/domain/                # JSON検証テスト
 tests/rules/                 # Firestore Security Rulesテスト
 ```
 
-詳細な確定要件と段階計画は [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) を参照してください。
+## Phase 1設計資料
+
+- [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md): Firestoreのコレクション、不変性、重複防止
+- [`docs/IMPORT_FORMAT.md`](docs/IMPORT_FORMAT.md): prediction/result JSON v1
+- [`docs/ROADMAP.md`](docs/ROADMAP.md): Phase 1の6マイルストーン
+- [`schemas/`](schemas/): 生成JSON Schema
+- [`examples/`](examples/): 架空テンプレートとサンプル
+
+確定要件は [`docs/REQUIREMENTS.md`](docs/REQUIREMENTS.md) を参照してください。

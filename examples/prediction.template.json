@@ -1,0 +1,137 @@
+{
+  "schema_version": "1.0.0",
+  "document_type": "prediction",
+  "race_id": "2099-01-01-TEMPLATE-01-OTHER",
+  "generated_at": "2099-01-01T09:00:00+09:00",
+  "source_agent": "replace-with-agent-name",
+  "sources": [],
+  "notes": "入力テンプレートです。実在レースの予想ではありません。確認できない値はunknownまたはnullのままにし、推測で補完しないでください。",
+  "race": {
+    "date": "2099-01-01",
+    "organizer": "OTHER",
+    "venue_code": "TEMPLATE",
+    "race_number": 1,
+    "name": "入力用テンプレートレース",
+    "surface": "unknown",
+    "distance_m": 1600,
+    "track_condition": "unknown",
+    "weather": "unknown"
+  },
+  "scenarios": [
+    {
+      "id": "slow",
+      "label": "スロー想定",
+      "pace": "slow",
+      "probability": 0.3,
+      "projected_order": [
+        { "horse_number": 1, "position_group": "front" },
+        { "horse_number": 2, "position_group": "stalker" },
+        { "horse_number": 3, "position_group": "closer" }
+      ],
+      "favored_styles": ["front", "stalker"],
+      "reason": "確認した材料を記入してください。",
+      "confidence": "unknown"
+    },
+    {
+      "id": "middle",
+      "label": "ミドル想定",
+      "pace": "middle",
+      "probability": 0.5,
+      "projected_order": [
+        { "horse_number": 1, "position_group": "front" },
+        { "horse_number": 2, "position_group": "stalker" },
+        { "horse_number": 3, "position_group": "midfield" }
+      ],
+      "favored_styles": ["stalker", "midfield"],
+      "reason": "確認した材料を記入してください。",
+      "confidence": "unknown"
+    },
+    {
+      "id": "high",
+      "label": "ハイ想定",
+      "pace": "high",
+      "probability": 0.2,
+      "projected_order": [
+        { "horse_number": 1, "position_group": "front" },
+        { "horse_number": 2, "position_group": "midfield" },
+        { "horse_number": 3, "position_group": "closer" }
+      ],
+      "favored_styles": ["closer"],
+      "reason": "確認した材料を記入してください。",
+      "confidence": "unknown"
+    }
+  ],
+  "horses": [
+    {
+      "horse_number": 1,
+      "frame_number": 1,
+      "name": "入力馬A",
+      "running_style": "front",
+      "past_performance": "確認した過去実績を記入してください。",
+      "form": "unknown",
+      "track_suitability": "unknown",
+      "distance_suitability": "unknown",
+      "scenario_assessments": {
+        "slow": "unknown",
+        "middle": "unknown",
+        "high": "unknown"
+      },
+      "probabilities": { "win": null, "top2": null, "top3": null },
+      "probability_source": "unset",
+      "rationale": "評価根拠を記入してください。",
+      "confidence": "unknown"
+    },
+    {
+      "horse_number": 2,
+      "frame_number": 2,
+      "name": "入力馬B",
+      "running_style": "stalker",
+      "past_performance": "確認した過去実績を記入してください。",
+      "form": "unknown",
+      "track_suitability": "unknown",
+      "distance_suitability": "unknown",
+      "scenario_assessments": {
+        "slow": "unknown",
+        "middle": "unknown",
+        "high": "unknown"
+      },
+      "probabilities": { "win": null, "top2": null, "top3": null },
+      "probability_source": "unset",
+      "rationale": "評価根拠を記入してください。",
+      "confidence": "unknown"
+    },
+    {
+      "horse_number": 3,
+      "frame_number": 3,
+      "name": "入力馬C",
+      "running_style": "closer",
+      "past_performance": "確認した過去実績を記入してください。",
+      "form": "unknown",
+      "track_suitability": "unknown",
+      "distance_suitability": "unknown",
+      "scenario_assessments": {
+        "slow": "unknown",
+        "middle": "unknown",
+        "high": "unknown"
+      },
+      "probabilities": { "win": null, "top2": null, "top3": null },
+      "probability_source": "unset",
+      "rationale": "評価根拠を記入してください。",
+      "confidence": "unknown"
+    }
+  ],
+  "bet_candidates": [
+    {
+      "id": "candidate-1",
+      "bet_type": "quinella",
+      "horse_numbers": [1, 2],
+      "odds": null,
+      "odds_observed_at": null,
+      "hit_probability": null,
+      "probability_source": "unset",
+      "rationale": "候補理由を記入してください。",
+      "confidence": "unknown"
+    }
+  ],
+  "change_reason": "初期予想"
+}
