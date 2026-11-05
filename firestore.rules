@@ -10,6 +10,138 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isFinalPredictionVersion(userId, raceId, versionId) {
+      return exists(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/predictionVersions/$(versionId))
+        && get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/predictionVersions/$(versionId)).data.status == 'final';
+    }
+
+    function hasValidPlanSettings(data) {
+      return data.settings is map
+        && data.settings.keys().hasOnly([
+          'betTypeMode',
+          'budgetYen',
+          'kellyFraction',
+          'lossControlBudgetFraction',
+          'maxSelections',
+          'maxStakePerBetYen',
+          'selectedBetTypes'
+        ])
+        && data.settings.betTypeMode in ['auto', 'manual']
+        && data.settings.budgetYen is int
+        && data.settings.budgetYen == data.budgetYen
+        && data.settings.kellyFraction is number
+        && data.settings.kellyFraction > 0
+        && data.settings.kellyFraction <= 1
+        && data.settings.lossControlBudgetFraction is number
+        && data.settings.lossControlBudgetFraction > 0
+        && data.settings.lossControlBudgetFraction <= 1
+        && data.settings.maxSelections is int
+        && data.settings.maxSelections >= 1
+        && data.settings.maxSelections <= 50
+        && data.settings.maxSelections >= data.allocations.size()
+        && data.settings.maxStakePerBetYen is int
+        && data.settings.maxStakePerBetYen >= 100
+        && data.settings.maxStakePerBetYen <= 10000000
+        && data.settings.maxStakePerBetYen % 100 == 0
+        && data.settings.selectedBetTypes is list
+        && data.settings.selectedBetTypes.size() <= 8
+        && data.settings.selectedBetTypes.toSet().size() == data.settings.selectedBetTypes.size()
+        && data.settings.selectedBetTypes.toSet().hasOnly([
+          'win',
+          'place',
+          'bracket_quinella',
+          'quinella',
+          'wide',
+          'exacta',
+          'trio',
+          'trifecta'
+        ]);
+    }
+
+    function hasValidPlanSummary(data) {
+      return data.summary is map
+        && data.summary.keys().hasOnly([
+          'expectedNetProfitYen',
+          'expectedPayoutYen',
+          'expectedReturnRatePercent',
+          'totalStakeYen',
+          'unusedBudgetYen',
+          'worstCaseLossYen'
+        ])
+        && data.summary.expectedNetProfitYen is number
+        && data.summary.expectedPayoutYen is number
+        && data.summary.expectedPayoutYen >= 0
+        && data.summary.totalStakeYen is int
+        && data.summary.totalStakeYen >= 0
+        && data.summary.totalStakeYen <= data.budgetYen
+        && data.summary.totalStakeYen % 100 == 0
+        && data.summary.expectedNetProfitYen >= -data.summary.totalStakeYen
+        && data.summary.unusedBudgetYen is int
+        && data.summary.unusedBudgetYen == data.budgetYen - data.summary.totalStakeYen
+        && data.summary.worstCaseLossYen is int
+        && data.summary.worstCaseLossYen == data.summary.totalStakeYen
+        && (
+          (data.summary.totalStakeYen == 0 && data.summary.expectedReturnRatePercent == null)
+          || (
+            data.summary.totalStakeYen > 0
+            && data.summary.expectedReturnRatePercent is number
+            && data.summary.expectedReturnRatePercent >= 0
+          )
+        );
+    }
+
+    function hasValidPlanShape(data, planId, userId) {
+      return data.keys().hasOnly([
+          'algorithmVersion',
+          'allocations',
+          'assumptions',
+          'authorUid',
+          'budgetYen',
+          'candidateSnapshot',
+          'createdAt',
+          'isSimulation',
+          'memo',
+          'name',
+          'planId',
+          'settings',
+          'sourcePredictionVersionId',
+          'strategy',
+          'summary',
+          'warnings'
+        ])
+        && data.planId is string
+        && data.planId == planId
+        && data.planId.matches('^[A-Za-z0-9_-]{8,120}$')
+        && data.authorUid is string
+        && data.authorUid == userId
+        && data.algorithmVersion == 'phase1-m4-v1'
+        && data.isSimulation == true
+        && data.name is string
+        && data.name.size() >= 1
+        && data.name.size() <= 120
+        && data.memo is string
+        && data.memo.size() <= 2000
+        && data.budgetYen is int
+        && data.budgetYen >= 0
+        && data.budgetYen <= 10000000
+        && data.sourcePredictionVersionId is string
+        && data.sourcePredictionVersionId.size() >= 1
+        && data.sourcePredictionVersionId.size() <= 1500
+        && data.strategy in ['expected_value', 'fractional_kelly', 'loss_control']
+        && data.allocations is list
+        && data.allocations.size() <= 50
+        && data.candidateSnapshot is list
+        && data.candidateSnapshot.size() == data.allocations.size()
+        && data.assumptions is list
+        && data.assumptions.size() <= 20
+        && data.warnings is list
+        && data.warnings.size() <= 100
+        && data.createdAt is timestamp
+        && data.createdAt == request.time
+        && hasValidPlanSettings(data)
+        && hasValidPlanSummary(data);
+    }
+
     match /users/{userId} {
       allow read, write: if isOwner(userId);
     }
@@ -59,7 +191,10 @@ service cloud.firestore {
     }
 
     match /users/{userId}/races/{raceId}/plans/{planId} {
-      allow read, create: if isOwner(userId);
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && hasValidPlanShape(request.resource.data, planId, userId)
+        && isFinalPredictionVersion(userId, raceId, request.resource.data.sourcePredictionVersionId);
       allow update, delete: if false;
     }
 

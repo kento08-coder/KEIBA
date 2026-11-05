@@ -89,19 +89,26 @@
 
 ### 3.4 `/plans/{planId}`
 
-購入提案のスナップショット。Milestone 4で実装する。
+購入提案の不変スナップショット。Milestone 4で実装する。
 
-- `sourcePredictionVersionId`
-- `strategy`: `expected_value` / `fractional_kelly` / `loss_control`
-- `budgetYen`
-- `candidateSnapshot`
-- `allocations`
-- `algorithmVersion`
-- `assumptions`
-- `createdAt`
-- `isSimulation`
+| フィールド | 型 | 内容 |
+|---|---|---|
+| `planId` | string | ドキュメントIDと同値。再試行時の重複保存防止キー |
+| `sourcePredictionVersionId` | string | 元の確定予想バージョンID |
+| `name` / `memo` | string | ユーザーが編集した名称とメモ |
+| `strategy` | enum | `expected_value` / `fractional_kelly` / `loss_control` |
+| `budgetYen` | non-negative integer | 設定予算 |
+| `settings` | map | 点数上限、1点上限、券種指定、ケリー係数、損失抑制使用率 |
+| `candidateSnapshot` | array | 使用候補の確率・オッズ・観測日時・確信度・根拠 |
+| `allocations` | array | 候補ID、100円単位の購入額、期待値計算結果 |
+| `summary` | map | 使用額、未使用額、期待利益線形和、全不的中時損失額 |
+| `algorithmVersion` | string | 初期版は`phase1-m4-v1` |
+| `assumptions` / `warnings` | string[] | 相関・推定値・計算前提 |
+| `authorUid` | string | 保存したユーザーUID |
+| `createdAt` | Timestamp | サーバー保存日時 |
+| `isSimulation` | literal `true` | 実購入ではない提案であることを明示 |
 
-提案確定後は編集せず、再計算時は別IDで作成する。
+保存transactionで元の確定予想の存在と同一`planId`の未保存を確認し、候補ID、券種、番号組、確率、オッズ、観測日時、確信度、確率出所を元の確定予想と突合する。Security Rulesでも所有UID、許可フィールド、主要型、配列件数、ドキュメントIDと`planId`の一致、元の確定予想の存在、提案フラグ、戦略、予算、集計額の基本関係、サーバー保存日時を検証する。提案確定後は編集せず、再計算・手動調整後の再保存は別IDで作成する。元予想やオッズが後で変更されても`candidateSnapshot`と計算結果は書き換えない。
 
 ### 3.5 `/purchases/{purchaseId}`
 
@@ -180,7 +187,7 @@ Phase 2で本格実装する台帳。Phase 1では購入・払戻の一貫性を
 
 Milestone 1では既知のコレクションだけを許可し、その他をデフォルト拒否する。認証済みでも別UIDにはアクセスできない。`predictionVersions`、`plans`、`importLog`、台帳は所有者でもupdate/deleteできない。購入と結果はdraftのみ更新・削除でき、confirmed/correctedは不変とする。
 
-Rulesはデータ内容すべての妥当性を保証するものではない。Zod検証、repository層、transaction、Rulesを重ねて保護する。
+Rulesはデータ内容すべての妥当性を保証するものではない。特に任意長配列の全要素集計、期待値の完全再計算、確定予想内の候補配列との完全な突合は行わない。Zod検証、repository層、transaction、Rulesを重ねるが、クライアント検証とクライアント上のtransaction比較は直接書き込みに対する完全な改ざん防止ではない。完全なサーバー側検証が必要な場合は、Cloud Functionsなどの信頼できるバックエンド経由だけで作成する。
 
 ## 7. インデックス方針
 

@@ -34,9 +34,9 @@ export function AppShell() {
           ))}
         </nav>
         <div className="mt-auto rounded-2xl border border-slate-line/70 bg-slate-card/70 p-4">
-          <p className="eyebrow">Phase 1 / M3</p>
+          <p className="eyebrow">Phase 1 / M4</p>
           <p className="mt-2 text-sm leading-6 text-muted">
-            確定予想の期待値を比較し、不明値は未算出として扱います。
+            予算上限内で3方式の購入プランを比較し、不変スナップショットとして保存します。
           </p>
         </div>
       </aside>

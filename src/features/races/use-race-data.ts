@@ -3,12 +3,14 @@ import type { Timestamp } from 'firebase/firestore'
 import type {
   PredictionDraftRecord,
   PredictionVersionRecord,
+  PurchasePlanRecord,
   RaceRecord,
 } from '../../domain/types/firestore'
 import {
   subscribePredictionDraft,
   subscribePredictionVersion,
   subscribePredictionVersions,
+  subscribePurchasePlans,
   subscribeRace,
   subscribeRaces,
 } from '../../infrastructure/repositories/race-repository'
@@ -172,4 +174,35 @@ export function usePredictionVersion(
   return result.key === key
     ? result
     : { error: null, state: 'loading' as const, value: null }
+}
+
+export function usePurchasePlans(
+  userId: string | null,
+  raceId: string | undefined,
+) {
+  const [result, setResult] = useState<
+    LiveValue<Array<PurchasePlanRecord<Timestamp | null>>>
+  >({ error: null, key: null, state: 'idle', value: [] })
+
+  useEffect(() => {
+    if (!userId || !raceId) {
+      return undefined
+    }
+    const key = `${userId}/${raceId}`
+    return subscribePurchasePlans(
+      userId,
+      raceId,
+      (value) => setResult({ error: null, key, state: 'ready', value }),
+      (error) =>
+        setResult({ error: errorMessage(error), key, state: 'error', value: [] }),
+    )
+  }, [raceId, userId])
+
+  const key = userId && raceId ? `${userId}/${raceId}` : null
+  if (!key) {
+    return { error: null, state: 'idle' as const, value: [] }
+  }
+  return result.key === key
+    ? result
+    : { error: null, state: 'loading' as const, value: [] }
 }
