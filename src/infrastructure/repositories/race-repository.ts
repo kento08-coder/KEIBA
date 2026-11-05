@@ -8,7 +8,10 @@ import {
   type Timestamp,
   type Unsubscribe,
 } from 'firebase/firestore'
-import { hashPredictionDocument } from '../../domain/prediction-utils'
+import {
+  hashPredictionDocument,
+  hasSamePredictionContent,
+} from '../../domain/prediction-utils'
 import type {
   ImportLogRecord,
   PredictionDraftRecord,
@@ -31,13 +34,15 @@ type FirestoreVersion = PredictionVersionRecord<Timestamp | null>
 export class RepositoryError extends Error {}
 export class DuplicateRaceError extends RepositoryError {}
 export class DuplicateImportError extends RepositoryError {}
+export class DuplicatePredictionVersionError extends RepositoryError {}
 export class DraftConflictError extends RepositoryError {}
 
-function requireFirestore(): Firestore {
-  if (!firestore) {
+function requireFirestore(database?: Firestore): Firestore {
+  const configuredFirestore = database ?? firestore
+  if (!configuredFirestore) {
     throw new RepositoryError('Firebaseが未設定です。設定画面を確認してください。')
   }
-  return firestore
+  return configuredFirestore
 }
 function userRacePath(userId: string, raceId: string) {
   return ['users', userId, 'races', raceId] as const
@@ -177,12 +182,13 @@ function assertValidPrediction(payload: PredictionDocument) {
 
 export async function savePredictionDraft(input: {
   clientId: string
+  database?: Firestore
   expectedRevision: number
   payload: PredictionDocument
   raceId: string
   userId: string
 }) {
-  const db = requireFirestore()
+  const db = requireFirestore(input.database)
   const payload = assertValidPrediction(input.payload)
   const draftRef = doc(
     db,
@@ -225,13 +231,14 @@ export async function savePredictionDraft(input: {
 
 export async function importPredictionDraft(input: {
   clientId: string
+  database?: Firestore
   expectedRevision: number
   payload: PredictionDocument
   raceId: string
   sourceFileName: string | null
   userId: string
 }) {
-  const db = requireFirestore()
+  const db = requireFirestore(input.database)
   const payload = assertValidPrediction(input.payload)
   if (payload.race_id !== input.raceId) {
     throw new RepositoryError('JSONのrace_idが表示中のレースと一致しません。')
@@ -300,11 +307,12 @@ export async function importPredictionDraft(input: {
 export async function finalizePrediction(input: {
   changeReason: string
   clientId: string
+  database?: Firestore
   expectedRevision: number
   raceId: string
   userId: string
 }) {
-  const db = requireFirestore()
+  const db = requireFirestore(input.database)
   const draftRef = doc(
     db,
     ...userRacePath(input.userId, input.raceId),
@@ -345,8 +353,13 @@ export async function finalizePrediction(input: {
       )
       const latestSnapshot = await transaction.get(latestRef)
       if (latestSnapshot.exists()) {
-        versionNumber =
-          (latestSnapshot.data() as FirestoreVersion).versionNumber + 1
+        const latestVersion = latestSnapshot.data() as FirestoreVersion
+        if (hasSamePredictionContent(latestVersion.snapshot, payload)) {
+          throw new DuplicatePredictionVersionError(
+            '最新の確定予想から予想内容が変更されていません。下書きを変更してから確定してください。',
+          )
+        }
+        versionNumber = latestVersion.versionNumber + 1
       }
     }
     const contentHash = await hashPredictionDocument(payload)

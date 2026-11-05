@@ -17,6 +17,26 @@ export function stableStringify(value: unknown) {
   return JSON.stringify(sortObject(value))
 }
 
+export function predictionContentForComparison(
+  document: PredictionDocument,
+) {
+  return Object.fromEntries(
+    Object.entries(document).filter(
+      ([key]) => key !== 'generated_at' && key !== 'change_reason',
+    ),
+  )
+}
+
+export function hasSamePredictionContent(
+  left: PredictionDocument,
+  right: PredictionDocument,
+) {
+  return (
+    stableStringify(predictionContentForComparison(left)) ===
+    stableStringify(predictionContentForComparison(right))
+  )
+}
+
 export async function hashPredictionDocument(document: PredictionDocument) {
   const bytes = new TextEncoder().encode(stableStringify(document))
   const digest = await crypto.subtle.digest('SHA-256', bytes)

@@ -1,7 +1,8 @@
 import { ArrowLeft, ClipboardPaste, FileJson, Upload } from 'lucide-react'
-import { useState, type ChangeEvent } from 'react'
+import { useMemo, useState, type ChangeEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { StatusNotice } from '../components/StatusNotice'
+import { diffPredictionDocuments } from '../domain/prediction-utils'
 import type { PredictionDocument } from '../domain/types/import'
 import {
   parseAndValidateImportJson,
@@ -27,6 +28,14 @@ function predictionFromResult(result: ImportValidationResult): ValidPrediction |
   return { document: result.data, warnings: result.warnings }
 }
 
+function displayDifferenceValue(value: unknown) {
+  if (value === undefined) {
+    return '（なし）'
+  }
+  const serialized = typeof value === 'string' ? value : JSON.stringify(value)
+  return serialized.length > 80 ? `${serialized.slice(0, 77)}…` : serialized
+}
+
 export function PredictionImportPage() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -39,6 +48,9 @@ export function PredictionImportPage() {
   const [result, setResult] = useState<ImportValidationResult | null>(null)
   const [localError, setLocalError] = useState<string | null>(null)
   const [importing, setImporting] = useState(false)
+  const [previewRevision, setPreviewRevision] = useState<number | null>(null)
+  const [previewDraft, setPreviewDraft] = useState<PredictionDocument | null>(null)
+  const [showReplaceConfirmation, setShowReplaceConfirmation] = useState(false)
 
   const validate = () => {
     setLocalError(null)
@@ -48,6 +60,9 @@ export function PredictionImportPage() {
     } else if (nextResult.success && id && nextResult.data.race_id !== id) {
       setLocalError('JSONのrace_idが表示中のレースと一致しません。')
     }
+    setPreviewRevision(draft.value?.revision ?? 0)
+    setPreviewDraft(draft.value?.payload ?? null)
+    setShowReplaceConfirmation(false)
     setResult(nextResult)
   }
 
@@ -60,11 +75,21 @@ export function PredictionImportPage() {
     setText(await file.text())
     setResult(null)
     setLocalError(null)
+    setPreviewRevision(null)
+    setPreviewDraft(null)
+    setShowReplaceConfirmation(false)
   }
 
   const importDraft = async () => {
     const valid = result ? predictionFromResult(result) : null
-    if (!valid || !userId || !id || localError || draft.state !== 'ready') {
+    if (
+      !valid ||
+      !userId ||
+      !id ||
+      localError ||
+      draft.state !== 'ready' ||
+      previewRevision === null
+    ) {
       return
     }
     setImporting(true)
@@ -72,7 +97,7 @@ export function PredictionImportPage() {
     try {
       await importPredictionDraft({
         clientId: getClientId(),
-        expectedRevision: draft.value?.revision ?? 0,
+        expectedRevision: previewRevision,
         payload: valid.document,
         raceId: id,
         sourceFileName: fileName,
@@ -92,12 +117,32 @@ export function PredictionImportPage() {
     }
   }
 
-  const validPrediction = result ? predictionFromResult(result) : null
+  const validPrediction = useMemo(
+    () => (result ? predictionFromResult(result) : null),
+    [result],
+  )
+  const replacementDraft = previewDraft ?? draft.value?.payload ?? null
+  const draftDifferences = useMemo(
+    () =>
+      validPrediction && replacementDraft
+        ? diffPredictionDocuments(replacementDraft, validPrediction.document)
+        : [],
+    [replacementDraft, validPrediction],
+  )
   const canImport =
     Boolean(validPrediction) &&
     !localError &&
     status === 'signed-in' &&
-    draft.state === 'ready'
+    draft.state === 'ready' &&
+    previewRevision !== null
+
+  const requestImport = () => {
+    if (replacementDraft) {
+      setShowReplaceConfirmation(true)
+      return
+    }
+    void importDraft()
+  }
 
   return (
     <div className="space-y-6">
@@ -140,6 +185,9 @@ export function PredictionImportPage() {
                 setFileName(null)
                 setResult(null)
                 setLocalError(null)
+                setPreviewRevision(null)
+                setPreviewDraft(null)
+                setShowReplaceConfirmation(false)
               }}
               placeholder="予想JSONをここに貼り付け"
               spellCheck={false}
@@ -181,11 +229,44 @@ export function PredictionImportPage() {
             </section>
           ) : <StatusNotice tone="success">Zod検証を通過しました。警告はありません。</StatusNotice>}
           <PredictionPreview document={validPrediction.document} />
+          {showReplaceConfirmation && replacementDraft ? (
+            <section className="card-surface border-amber-400/40 p-5" role="alertdialog" aria-labelledby="replace-draft-title">
+              <h2 className="font-bold text-amber-100" id="replace-draft-title">現在の下書きを置き換えます</h2>
+              <p className="mt-2 text-sm leading-6 text-amber-50/90">
+                現在の下書きが存在します。実行すると取り込みJSONの内容で下書きが置き換わります。確定済みの予想バージョンは変更されません。
+              </p>
+              <div className="mt-4 rounded-xl border border-slate-line/80 bg-navy-950/60 p-4">
+                <p className="text-xs font-bold text-muted">主な違い（{draftDifferences.length}項目）</p>
+                {draftDifferences.length === 0 ? (
+                  <p className="mt-2 text-sm text-muted">予想JSONの内容に差分はありません。</p>
+                ) : (
+                  <ul className="mt-3 space-y-2 text-xs">
+                    {draftDifferences.slice(0, 8).map((difference) => (
+                      <li className="rounded-lg bg-navy-900/80 p-3" key={difference.path}>
+                        <code className="break-all text-teal-accent">{difference.path || '$'}</code>
+                        <p className="mt-1 break-words text-muted">
+                          {displayDifferenceValue(difference.before)} →{' '}
+                          <span className="text-copy">{displayDifferenceValue(difference.after)}</span>
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {draftDifferences.length > 8 ? <p className="mt-2 text-xs text-muted">ほか{draftDifferences.length - 8}項目</p> : null}
+              </div>
+              <div className="mt-4 flex flex-wrap justify-end gap-2">
+                <button className="button-secondary" disabled={importing} onClick={() => setShowReplaceConfirmation(false)} type="button">キャンセル</button>
+                <button className="button-primary" disabled={!canImport || importing} onClick={() => void importDraft()} type="button">
+                  {importing ? '置き換え中…' : '下書きを置き換える'}
+                </button>
+              </div>
+            </section>
+          ) : null}
           <div className="sticky bottom-20 z-10 rounded-2xl border border-slate-line bg-navy-950/95 p-4 shadow-2xl backdrop-blur md:bottom-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-sm text-muted">確定版は変更せず、現在の編集可能な下書きへ反映します。</p>
-              <button className="button-primary" disabled={!canImport || importing} onClick={() => void importDraft()} type="button">
-                {importing ? '反映中…' : '下書きへ反映'}
+              <button className="button-primary" disabled={!canImport || importing} onClick={requestImport} type="button">
+                {importing ? '反映中…' : replacementDraft ? '下書き置換を確認' : '下書きへ反映'}
               </button>
             </div>
           </div>

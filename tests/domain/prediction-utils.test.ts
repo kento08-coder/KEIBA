@@ -2,6 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import {
   diffPredictionDocuments,
+  hasSamePredictionContent,
   stableStringify,
 } from '../../src/domain/prediction-utils'
 import type { PredictionDocument } from '../../src/domain/types/import'
@@ -25,6 +26,26 @@ describe('stableStringify', () => {
     )
   })
 })
+
+describe('prediction content comparison', () => {
+  it('ignores generated time and change reason metadata', () => {
+    const before = samplePrediction()
+    const after = structuredClone(before)
+    after.generated_at = '2026-11-08T13:00:00+09:00'
+    after.change_reason = '変更理由だけを更新'
+
+    expect(hasSamePredictionContent(before, after)).toBe(true)
+  })
+
+  it('detects a substantive prediction change', () => {
+    const before = samplePrediction()
+    const after = structuredClone(before)
+    after.horses[0]!.rationale = '評価根拠を変更'
+
+    expect(hasSamePredictionContent(before, after)).toBe(false)
+  })
+})
+
 describe('prediction version differences', () => {
   it('reports changed fields with old and new values', () => {
     const before = samplePrediction()
