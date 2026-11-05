@@ -16,6 +16,7 @@ import {
 } from './expected-value'
 
 export const PURCHASE_UNIT_YEN = 100
+export const PURCHASE_PLAN_MAX_BUDGET_YEN = 10_000_000
 export const PURCHASE_PLAN_ALGORITHM_VERSION = 'phase1-m4-v1'
 
 export class PurchasePlanSettingsError extends Error {
@@ -80,8 +81,14 @@ export function floorToPurchaseUnit(amountYen: number) {
 
 export function validatePurchasePlanSettings(settings: PurchasePlanSettings) {
   const issues: string[] = []
-  if (!Number.isInteger(settings.budgetYen) || settings.budgetYen < 0) {
-    issues.push('予算は0円以上の整数で指定してください。')
+  if (
+    !Number.isInteger(settings.budgetYen) ||
+    settings.budgetYen < 0 ||
+    settings.budgetYen > PURCHASE_PLAN_MAX_BUDGET_YEN
+  ) {
+    issues.push(
+      `予算は0円以上${PURCHASE_PLAN_MAX_BUDGET_YEN.toLocaleString('ja-JP')}円以下の整数で指定してください。`,
+    )
   }
   if (
     !Number.isInteger(settings.maxSelections) ||
@@ -93,9 +100,12 @@ export function validatePurchasePlanSettings(settings: PurchasePlanSettings) {
   if (
     !Number.isInteger(settings.maxStakePerBetYen) ||
     settings.maxStakePerBetYen < PURCHASE_UNIT_YEN ||
+    settings.maxStakePerBetYen > PURCHASE_PLAN_MAX_BUDGET_YEN ||
     settings.maxStakePerBetYen % PURCHASE_UNIT_YEN !== 0
   ) {
-    issues.push('1点上限は100円以上かつ100円単位で指定してください。')
+    issues.push(
+      `1点上限は100円以上${PURCHASE_PLAN_MAX_BUDGET_YEN.toLocaleString('ja-JP')}円以下かつ100円単位で指定してください。`,
+    )
   }
   if (
     !isFiniteNumber(settings.kellyFraction) ||
@@ -650,6 +660,64 @@ export function buildPurchasePlanWriteData(input: {
 
 function approximatelyEqual(left: number, right: number) {
   return Math.abs(left - right) <= persistedNumberTolerance
+}
+
+function sameNumberSequence(left: number[], right: number[]) {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  )
+}
+
+export function validatePlanCandidatesAgainstPrediction(
+  candidateSnapshots: PlanCandidateSnapshot[],
+  prediction: { bet_candidates: BetCandidate[] },
+) {
+  const issues: string[] = []
+  const predictionCandidateById = new Map(
+    prediction.bet_candidates.map((candidate) => [candidate.id, candidate]),
+  )
+
+  for (const snapshot of candidateSnapshots) {
+    const source = predictionCandidateById.get(snapshot.candidateId)
+    if (!source) {
+      issues.push(
+        `候補${snapshot.candidateId}が元の確定予想に存在しません。`,
+      )
+      continue
+    }
+    if (snapshot.betType !== source.bet_type) {
+      issues.push(`候補${snapshot.candidateId}の券種が元の確定予想と一致しません。`)
+    }
+    if (!sameNumberSequence(snapshot.selections, source.horse_numbers)) {
+      issues.push(
+        `候補${snapshot.candidateId}の馬番・枠番が元の確定予想と一致しません。`,
+      )
+    }
+    if (snapshot.hitProbability !== source.hit_probability) {
+      issues.push(
+        `候補${snapshot.candidateId}の推定的中確率が元の確定予想と一致しません。`,
+      )
+    }
+    if (snapshot.odds !== source.odds) {
+      issues.push(`候補${snapshot.candidateId}のオッズが元の確定予想と一致しません。`)
+    }
+    if (snapshot.oddsObservedAt !== source.odds_observed_at) {
+      issues.push(
+        `候補${snapshot.candidateId}のオッズ観測日時が元の確定予想と一致しません。`,
+      )
+    }
+    if (snapshot.confidence !== source.confidence) {
+      issues.push(`候補${snapshot.candidateId}の確信度が元の確定予想と一致しません。`)
+    }
+    if (snapshot.probabilitySource !== source.probability_source) {
+      issues.push(
+        `候補${snapshot.candidateId}の確率出所が元の確定予想と一致しません。`,
+      )
+    }
+  }
+
+  return issues
 }
 
 export function validatePurchasePlanWriteData(data: PurchasePlanWriteData) {

@@ -13,6 +13,7 @@ import {
   hasSamePredictionContent,
 } from '../../domain/prediction-utils'
 import {
+  validatePlanCandidatesAgainstPrediction,
   validatePurchasePlanWriteData,
   type PurchasePlanWriteData,
 } from '../../domain/calculations/purchase-plan'
@@ -467,6 +468,14 @@ export async function savePurchasePlan(input: {
     const version = versionSnapshot.data() as FirestoreVersion
     if (version.status !== 'final') {
       throw new RepositoryError('確定予想以外から購入プランを保存できません。')
+    }
+    const sourcePrediction = assertValidPrediction(version.snapshot)
+    const sourceCandidateIssues = validatePlanCandidatesAgainstPrediction(
+      input.data.candidateSnapshot,
+      sourcePrediction,
+    )
+    if (sourceCandidateIssues.length > 0) {
+      throw new RepositoryError(sourceCandidateIssues.join(' '))
     }
     transaction.set(planRef, {
       ...input.data,

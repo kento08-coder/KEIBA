@@ -37,6 +37,63 @@ afterAll(async () => {
   await testEnvironment.cleanup()
 })
 
+function validPlanDocument(planId = 'plan-0001') {
+  return {
+    algorithmVersion: 'phase1-m4-v1',
+    allocations: [
+      {
+        candidateId: 'candidate-1',
+        expectedNetProfitYen: 20,
+        expectedPayoutYen: 120,
+        expectedReturnRatePercent: 120,
+        referenceKellyFraction: 0.2,
+        stakeYen: 100,
+      },
+    ],
+    assumptions: [],
+    authorUid: 'owner-a',
+    budgetYen: 1_000,
+    candidateSnapshot: [
+      {
+        betType: 'win',
+        candidateId: 'candidate-1',
+        confidence: 'high',
+        hitProbability: 0.6,
+        odds: 2,
+        oddsObservedAt: '2026-11-08T12:00:00+09:00',
+        probabilitySource: 'ai_estimate',
+        rationale: 'Rulesテスト',
+        selections: [1],
+      },
+    ],
+    createdAt: serverTimestamp(),
+    isSimulation: true,
+    memo: '',
+    name: 'Rulesテストプラン',
+    planId,
+    settings: {
+      betTypeMode: 'auto',
+      budgetYen: 1_000,
+      kellyFraction: 0.25,
+      lossControlBudgetFraction: 0.3,
+      maxSelections: 5,
+      maxStakePerBetYen: 500,
+      selectedBetTypes: [],
+    },
+    sourcePredictionVersionId: 'version-1',
+    strategy: 'expected_value',
+    summary: {
+      expectedNetProfitYen: 20,
+      expectedPayoutYen: 120,
+      expectedReturnRatePercent: 120,
+      totalStakeYen: 100,
+      unusedBudgetYen: 900,
+      worstCaseLossYen: 100,
+    },
+    warnings: [],
+  }
+}
+
 describe('Firestore ownership rules', () => {
   it('allows an authenticated owner to read and write inside their user tree', async () => {
     const ownerDb = testEnvironment.authenticatedContext('owner-a').firestore()
@@ -113,15 +170,15 @@ describe('Firestore ownership rules', () => {
     const anonymousDb = testEnvironment.unauthenticatedContext().firestore()
     const ownerPlanRef = doc(
       ownerDb,
-      'users/owner-a/races/race-1/plans/plan-1',
+      'users/owner-a/races/race-1/plans/plan-0001',
     )
     const intruderPlanRef = doc(
       intruderDb,
-      'users/owner-a/races/race-1/plans/plan-1',
+      'users/owner-a/races/race-1/plans/plan-0001',
     )
     const anonymousPlanRef = doc(
       anonymousDb,
-      'users/owner-a/races/race-1/plans/plan-1',
+      'users/owner-a/races/race-1/plans/plan-0001',
     )
     const sourceVersionRef = doc(
       ownerDb,
@@ -132,23 +189,15 @@ describe('Firestore ownership rules', () => {
       setDoc(sourceVersionRef, { authorUid: 'owner-a', status: 'final' }),
     )
     await assertSucceeds(
-      setDoc(ownerPlanRef, {
-        algorithmVersion: 'phase1-m4-v1',
-        authorUid: 'owner-a',
-        budgetYen: 1_000,
-        createdAt: serverTimestamp(),
-        isSimulation: true,
-        planId: 'plan-1',
-        sourcePredictionVersionId: 'version-1',
-        strategy: 'expected_value',
-      }),
+      setDoc(ownerPlanRef, validPlanDocument()),
     )
     await assertSucceeds(getDoc(ownerPlanRef))
     await assertFails(updateDoc(ownerPlanRef, { budgetYen: 2_000 }))
     await assertFails(deleteDoc(ownerPlanRef))
     await assertFails(getDoc(intruderPlanRef))
-    await assertFails(setDoc(intruderPlanRef, { planId: 'intruder' }))
+    await assertFails(setDoc(intruderPlanRef, validPlanDocument()))
     await assertFails(getDoc(anonymousPlanRef))
+    await assertFails(setDoc(anonymousPlanRef, validPlanDocument()))
   })
 
   it('rejects a plan with a mismatched id or author', async () => {
@@ -159,32 +208,22 @@ describe('Firestore ownership rules', () => {
     )
     const planRef = doc(
       ownerDb,
-      'users/owner-a/races/race-1/plans/plan-1',
+      'users/owner-a/races/race-1/plans/plan-0001',
     )
-    const validBase = {
-      algorithmVersion: 'phase1-m4-v1',
-      budgetYen: 1_000,
-      createdAt: serverTimestamp(),
-      isSimulation: true,
-      sourcePredictionVersionId: 'version-1',
-      strategy: 'expected_value',
-    }
 
     await assertSucceeds(
       setDoc(sourceVersionRef, { authorUid: 'owner-a', status: 'final' }),
     )
     await assertFails(
       setDoc(planRef, {
-        ...validBase,
-        authorUid: 'owner-a',
+        ...validPlanDocument(),
         planId: 'different-plan',
       }),
     )
     await assertFails(
       setDoc(planRef, {
-        ...validBase,
+        ...validPlanDocument(),
         authorUid: 'owner-b',
-        planId: 'plan-1',
       }),
     )
   })
@@ -193,19 +232,65 @@ describe('Firestore ownership rules', () => {
     const ownerDb = testEnvironment.authenticatedContext('owner-a').firestore()
     const planRef = doc(
       ownerDb,
-      'users/owner-a/races/race-1/plans/plan-1',
+      'users/owner-a/races/race-1/plans/plan-0001',
     )
 
     await assertFails(
       setDoc(planRef, {
-        algorithmVersion: 'phase1-m4-v1',
-        authorUid: 'owner-a',
-        budgetYen: 1_000,
-        createdAt: serverTimestamp(),
-        isSimulation: true,
-        planId: 'plan-1',
+        ...validPlanDocument(),
         sourcePredictionVersionId: 'missing-version',
-        strategy: 'expected_value',
+      }),
+    )
+  })
+
+  it('rejects malformed plan fields, excessive arrays, and an abnormal budget', async () => {
+    const ownerDb = testEnvironment.authenticatedContext('owner-a').firestore()
+    const sourceVersionRef = doc(
+      ownerDb,
+      'users/owner-a/races/race-1/predictionVersions/version-1',
+    )
+    const malformedRef = doc(
+      ownerDb,
+      'users/owner-a/races/race-1/plans/plan-bad-shape',
+    )
+    const excessiveRef = doc(
+      ownerDb,
+      'users/owner-a/races/race-1/plans/plan-too-many',
+    )
+    const budgetRef = doc(
+      ownerDb,
+      'users/owner-a/races/race-1/plans/plan-bad-budget',
+    )
+
+    await assertSucceeds(
+      setDoc(sourceVersionRef, { authorUid: 'owner-a', status: 'final' }),
+    )
+    await assertFails(
+      setDoc(malformedRef, {
+        ...validPlanDocument('plan-bad-shape'),
+        allocations: { candidateId: 'candidate-1' },
+        unexpectedField: true,
+      }),
+    )
+    await assertFails(
+      setDoc(excessiveRef, {
+        ...validPlanDocument('plan-too-many'),
+        allocations: Array.from({ length: 51 }, () => ({})),
+        candidateSnapshot: Array.from({ length: 51 }, () => ({})),
+      }),
+    )
+    await assertFails(
+      setDoc(budgetRef, {
+        ...validPlanDocument('plan-bad-budget'),
+        budgetYen: 10_000_001,
+        settings: {
+          ...validPlanDocument().settings,
+          budgetYen: 10_000_001,
+        },
+        summary: {
+          ...validPlanDocument().summary,
+          unusedBudgetYen: 9_999_901,
+        },
       }),
     )
   })

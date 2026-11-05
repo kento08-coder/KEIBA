@@ -8,6 +8,7 @@ import { doc, getDoc, setDoc, type Firestore } from 'firebase/firestore'
 import {
   buildPurchasePlanWriteData,
   generatePurchasePlan,
+  PURCHASE_PLAN_MAX_BUDGET_YEN,
 } from '../../src/domain/calculations/purchase-plan'
 import type { PredictionDocument } from '../../src/domain/types/import'
 import type { PurchasePlanSettings } from '../../src/domain/types/purchase-plan'
@@ -59,7 +60,7 @@ afterAll(async () => {
   await testEnvironment.cleanup()
 })
 
-async function seedPredictionVersion() {
+async function seedPredictionVersion(prediction = samplePrediction()) {
   const database = testEnvironment.authenticatedContext(userId).firestore()
   await setDoc(doc(database, `users/${userId}/races/${raceId}`), {
     raceId,
@@ -72,7 +73,7 @@ async function seedPredictionVersion() {
     ),
     {
       authorUid: userId,
-      snapshot: samplePrediction(),
+      snapshot: prediction,
       status: 'final',
       versionNumber: 1,
     },
@@ -139,5 +140,80 @@ describe('purchase plan persistence', () => {
     await expect(
       savePurchasePlan({ data, database, raceId, userId }),
     ).rejects.toBeInstanceOf(RepositoryError)
+  })
+
+  it('rejects a plan when its probability differs from the final prediction', async () => {
+    const data = buildPlan()
+    const sourcePrediction = samplePrediction()
+    const sourceCandidate = sourcePrediction.bet_candidates.find(
+      (candidate) => candidate.id === data.candidateSnapshot[0]?.candidateId,
+    )
+    expect(sourceCandidate?.hit_probability).not.toBeNull()
+    sourceCandidate!.hit_probability = sourceCandidate!.hit_probability! + 0.01
+    const database = await seedPredictionVersion(sourcePrediction)
+
+    await expect(
+      savePurchasePlan({ data, database, raceId, userId }),
+    ).rejects.toThrow(/推定的中確率が元の確定予想と一致しません/)
+  })
+
+  it('rejects a plan when its odds differ from the final prediction', async () => {
+    const data = buildPlan()
+    const sourcePrediction = samplePrediction()
+    const sourceCandidate = sourcePrediction.bet_candidates.find(
+      (candidate) => candidate.id === data.candidateSnapshot[0]?.candidateId,
+    )
+    expect(sourceCandidate?.odds).not.toBeNull()
+    sourceCandidate!.odds = sourceCandidate!.odds! + 0.1
+    const database = await seedPredictionVersion(sourcePrediction)
+
+    await expect(
+      savePurchasePlan({ data, database, raceId, userId }),
+    ).rejects.toThrow(/オッズが元の確定予想と一致しません/)
+  })
+
+  it('rejects a plan candidate that does not exist in the final prediction', async () => {
+    const data = buildPlan()
+    const candidateId = data.candidateSnapshot[0]!.candidateId
+    const sourcePrediction = samplePrediction()
+    sourcePrediction.bet_candidates = sourcePrediction.bet_candidates.filter(
+      (candidate) => candidate.id !== candidateId,
+    )
+    const database = await seedPredictionVersion(sourcePrediction)
+
+    await expect(
+      savePurchasePlan({ data, database, raceId, userId }),
+    ).rejects.toThrow(/元の確定予想に存在しません/)
+  })
+
+  it('rejects an excessive budget, budget overrun, or tampered calculation before saving', async () => {
+    const database = await seedPredictionVersion()
+    const excessiveBudget = structuredClone(buildPlan())
+    excessiveBudget.budgetYen = PURCHASE_PLAN_MAX_BUDGET_YEN + 1
+    excessiveBudget.settings.budgetYen = PURCHASE_PLAN_MAX_BUDGET_YEN + 1
+
+    await expect(
+      savePurchasePlan({ data: excessiveBudget, database, raceId, userId }),
+    ).rejects.toThrow(/10,000,000円以下/)
+
+    const budgetTampered = structuredClone(buildPlan())
+    budgetTampered.budgetYen = 100
+    budgetTampered.settings.budgetYen = 100
+
+    await expect(
+      savePurchasePlan({ data: budgetTampered, database, raceId, userId }),
+    ).rejects.toThrow(/予算を超えています/)
+
+    const calculationTampered = structuredClone(buildPlan())
+    calculationTampered.allocations[0]!.expectedNetProfitYen += 1
+
+    await expect(
+      savePurchasePlan({
+        data: calculationTampered,
+        database,
+        raceId,
+        userId,
+      }),
+    ).rejects.toThrow(/期待値スナップショットが不整合です/)
   })
 })
