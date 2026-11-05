@@ -1,4 +1,5 @@
 import { ArrowLeft, GitCompare, ShieldCheck } from 'lucide-react'
+import { lazy, Suspense } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { StatusNotice } from '../components/StatusNotice'
 import { diffPredictionDocuments } from '../domain/prediction-utils'
@@ -9,6 +10,10 @@ import {
   usePredictionVersion,
   usePredictionVersions,
 } from '../features/races/use-race-data'
+
+const ExpectedValueAnalysis = lazy(
+  () => import('../features/bets/ExpectedValueAnalysis'),
+)
 
 function displayValue(value: unknown) {
   if (value === undefined) {
@@ -59,6 +64,10 @@ export function PredictionVersionPage() {
         </div>
         <p className="mt-4 break-all font-mono text-xs text-muted">SHA-256: {version.value.contentHash}</p>
       </section>
+
+      <Suspense fallback={<StatusNotice>期待値を計算しています…</StatusNotice>}>
+        <ExpectedValueAnalysis prediction={version.value.snapshot} />
+      </Suspense>
 
       <section>
         <div className="mb-3 flex items-end justify-between gap-3">

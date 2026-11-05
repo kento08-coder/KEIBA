@@ -147,3 +147,9 @@ Zodスキーマをランタイム検証の正とする。生成JSON Schemaは外
 ## 6. Milestone 2での取込フロー
 
 Milestone 2で、ファイルとテキスト貼付けの両方を同じ`parseAndValidateImportJson`へ渡す。検証結果をプレビューし、エラー0件の場合だけ下書きへ反映する。確定版は上書きしない。
+
+## 7. Milestone 3での期待値計算
+
+`bet_candidates[]`の`hit_probability`、`odds`、`odds_observed_at`を使い、確定予想の表示時に期待値を再計算する。`odds_observed_at`はオッズの観測日時であり、最終オッズの確定状態を表さない。`odds`と観測日時が両方記録済みの場合に「観測時点のオッズ」として計算する。計算結果をインポートJSONの正とはせず、未設定・不正・観測日時のない値は未算出とする。詳細は[`EXPECTED_VALUE.md`](EXPECTED_VALUE.md)を参照する。
+
+現行v1スキーマはオッズ範囲と展開別の馬券条件付き的中確率を持たない。単一値や各馬評価から補完せず、将来のスキーマ版更新まで未算出として扱う。

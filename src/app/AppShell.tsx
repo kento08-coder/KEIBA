@@ -34,9 +34,9 @@ export function AppShell() {
           ))}
         </nav>
         <div className="mt-auto rounded-2xl border border-slate-line/70 bg-slate-card/70 p-4">
-          <p className="eyebrow">Phase 1 / M2</p>
+          <p className="eyebrow">Phase 1 / M3</p>
           <p className="mt-2 text-sm leading-6 text-muted">
-            レース・予想JSON・下書き・確定バージョンをクラウド同期します。
+            確定予想の期待値を比較し、不明値は未算出として扱います。
           </p>
         </div>
       </aside>

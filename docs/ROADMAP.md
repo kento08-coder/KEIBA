@@ -11,7 +11,7 @@
 - 正常系・異常系・警告のユニットテスト
 - 既知コレクション限定のSecurity Rulesと確定予想の不変化
 
-## Milestone 2 — レース・予想管理（今回）
+## Milestone 2 — レース・予想管理（完了）
 
 - `features/races`、`features/predictions`、薄いFirestore repository層
 - レース一覧・詳細・登録
@@ -20,7 +20,7 @@
 - revisionによる競合検知
 - transactionによる確定版発行、バージョン比較
 
-## Milestone 3 — 期待値計算エンジン
+## Milestone 3 — 期待値計算エンジン（今回）
 
 - `domain/calculations`にFirebase非依存の純粋関数
 - 全8券種の組合せ正規化
