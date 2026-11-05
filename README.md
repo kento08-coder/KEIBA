@@ -2,9 +2,11 @@
 
 競馬の予想・購入記録・結果分析を一貫して管理するための、個人向けWebアプリです。
 
-**Phase 0（開発基盤）** と **Phase 1 Milestone 1〜2（データモデル・レース／予想管理）** までを実装しています。画面上の成績と`examples/`のJSONは検証用の架空サンプルであり、実在するレースや購入記録ではありません。期待値計算、購入プラン生成、実購入記録、結果分析は後続マイルストーンで実装します。
+**Phase 0（開発基盤）** と **Phase 1 Milestone 1〜3（データモデル・レース／予想管理・期待値計算）** までを実装しています。画面上の成績と`examples/`のJSONは検証用の架空サンプルであり、実在するレースや購入記録ではありません。購入プラン生成、実購入記録、結果分析は後続マイルストーンで実装します。
 
 Milestone 2では、レース登録、予想JSONのファイル／貼り付け取込、Zod検証プレビュー、詳細分析編集、下書き自動保存、競合検知、確定予想バージョン、差分表示を追加しています。既存下書きの置換前には差分と確認操作を表示し、最新確定版から予想内容が変わっていない再確定は拒否します。クラウド機能はGoogleログイン後に有効になります。
+
+Milestone 3では、全8券種の期待回収率・期待払戻金・期待純利益・損益分岐確率・推定確率優位幅を純粋関数で計算し、確定予想画面で比較できます。未確認値は補完せず、AI推定に基づく参考値であって購入推奨や利益保証ではないことを明示します。
 
 ## 技術構成
 
@@ -139,10 +141,11 @@ Firebase Web設定値はクライアントへ配信される公開設定です�
 src/
   app/                       # ルーティングとアプリシェル
   components/                # 共通UI
-  domain/                    # 型、Zod検証、差分・ハッシュ用純粋処理
+  domain/                    # 型、Zod検証、期待値・差分・ハッシュ用純粋処理
   features/auth/             # 認証コンテキストとUI
   features/races/            # レースモデルとリアルタイム購読
   features/predictions/      # 予想プレビューと編集UI
+  features/bets/             # 期待値比較UI
   infrastructure/firebase/  # Firebase初期化
   infrastructure/repositories/ # Firestore transaction／購読境界
   pages/                     # 画面とルーティング
@@ -156,6 +159,8 @@ tests/rules/                 # Firestore Security Rulesテスト
 - [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md): Firestoreのコレクション、不変性、重複防止
 - [`docs/IMPORT_FORMAT.md`](docs/IMPORT_FORMAT.md): prediction/result JSON v1
 - [`docs/ROADMAP.md`](docs/ROADMAP.md): Phase 1の6マイルストーン
+- [`docs/EXPECTED_VALUE.md`](docs/EXPECTED_VALUE.md): 期待値・展開加重計算仕様
+- [`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md): 依存関係とActionsの確認結果
 - [`schemas/`](schemas/): 生成JSON Schema
 - [`examples/`](examples/): 架空テンプレートとサンプル
 
