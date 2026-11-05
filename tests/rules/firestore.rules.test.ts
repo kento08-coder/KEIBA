@@ -94,6 +94,56 @@ function validPlanDocument(planId = 'plan-0001') {
   }
 }
 
+function validPurchaseDocument(
+  purchaseId: string,
+  status: 'draft' | 'confirmed' | 'corrected' = 'confirmed',
+) {
+  return {
+    authorUid: 'owner-a',
+    confirmedAt: status === 'draft' ? null : serverTimestamp(),
+    correctionOf: null,
+    correctionSequence: 0,
+    createdAt: serverTimestamp(),
+    idempotencyKey: `idempotency-${purchaseId}`,
+    items: [{ betType: 'win', itemId: 'item-0001', selections: [1], stakeYen: 100 }],
+    memo: '',
+    placedAt: '2026-11-08T12:00:00+09:00',
+    purchaseId,
+    raceId: 'race-1',
+    recordedAt: serverTimestamp(),
+    revision: 1,
+    rootPurchaseId: purchaseId,
+    sourcePlanId: null,
+    sourcePredictionVersionId: null,
+    status,
+    totalStakeYen: 100,
+    updatedAt: serverTimestamp(),
+  }
+}
+
+function validResultDocument(resultId = 'result-0001') {
+  return {
+    authorUid: 'owner-a',
+    confirmedAt: serverTimestamp(),
+    contentHash: 'a'.repeat(64),
+    correctionOf: null,
+    correctionSequence: 0,
+    createdAt: serverTimestamp(),
+    idempotencyKey: `idempotency-${resultId}`,
+    importId: `import-${resultId}`,
+    payload: {
+      race_id: 'race-1',
+      finishers: [{ horse_number: 1 }],
+      payouts: [{ bet_type: 'win' }],
+    },
+    raceId: 'race-1',
+    resultId,
+    rootResultId: resultId,
+    status: 'confirmed',
+    updatedAt: serverTimestamp(),
+  }
+}
+
 describe('Firestore ownership rules', () => {
   it('allows an authenticated owner to read and write inside their user tree', async () => {
     const ownerDb = testEnvironment.authenticatedContext('owner-a').firestore()
@@ -306,14 +356,66 @@ describe('Firestore ownership rules', () => {
       'users/owner-a/races/race-1/purchases/confirmed-purchase',
     )
 
-    await assertSucceeds(setDoc(draftRef, { status: 'draft' }))
-    await assertSucceeds(updateDoc(draftRef, { status: 'confirmed' }))
+    await assertSucceeds(setDoc(draftRef, validPurchaseDocument('draft-purchase', 'draft')))
+    await assertSucceeds(setDoc(draftRef, {
+      ...validPurchaseDocument('draft-purchase', 'confirmed'),
+      revision: 2,
+    }))
     await assertFails(updateDoc(draftRef, { totalStakeYen: 500 }))
     await assertFails(deleteDoc(draftRef))
 
-    await assertSucceeds(setDoc(confirmedRef, { status: 'confirmed' }))
+    await assertSucceeds(setDoc(confirmedRef, validPurchaseDocument('confirmed-purchase')))
     await assertFails(updateDoc(confirmedRef, { totalStakeYen: 500 }))
     await assertFails(deleteDoc(confirmedRef))
+  })
+
+  it('rejects malformed purchases and invalid purchase amounts', async () => {
+    const ownerDb = testEnvironment.authenticatedContext('owner-a').firestore()
+    const malformedRef = doc(ownerDb, 'users/owner-a/races/race-1/purchases/purchase-bad-shape')
+    const amountRef = doc(ownerDb, 'users/owner-a/races/race-1/purchases/purchase-bad-amount')
+
+    await assertFails(setDoc(malformedRef, { status: 'confirmed', totalStakeYen: 100 }))
+    await assertFails(setDoc(amountRef, {
+      ...validPurchaseDocument('purchase-bad-amount'),
+      totalStakeYen: 150,
+    }))
+  })
+
+  it('keeps confirmed results immutable and rejects malformed result fields', async () => {
+    const ownerDb = testEnvironment.authenticatedContext('owner-a').firestore()
+    const resultRef = doc(ownerDb, 'users/owner-a/races/race-1/results/result-0001')
+    const malformedRef = doc(ownerDb, 'users/owner-a/races/race-1/results/result-malformed')
+
+    await assertSucceeds(setDoc(resultRef, validResultDocument()))
+    await assertFails(updateDoc(resultRef, { contentHash: 'changed' }))
+    await assertFails(deleteDoc(resultRef))
+    await assertFails(setDoc(malformedRef, {
+      ...validResultDocument('result-malformed'),
+      payload: { race_id: 'other-race', finishers: [], payouts: [] },
+    }))
+  })
+
+  it('validates immutable bankroll transactions and their owner', async () => {
+    const ownerDb = testEnvironment.authenticatedContext('owner-a').firestore()
+    const intruderDb = testEnvironment.authenticatedContext('owner-b').firestore()
+    const ledgerRef = doc(ownerDb, 'users/owner-a/bankrollTransactions/stake-purchase-1')
+    const intruderRef = doc(intruderDb, 'users/owner-a/bankrollTransactions/stake-purchase-2')
+    const transaction = {
+      amountYen: -100,
+      at: serverTimestamp(),
+      authorUid: 'owner-a',
+      idempotencyKey: 'stake-purchase-1',
+      kind: 'stake',
+      note: '購入確定',
+      raceId: 'race-1',
+      referenceId: 'purchase-1',
+      transactionId: 'stake-purchase-1',
+    }
+
+    await assertSucceeds(setDoc(ledgerRef, transaction))
+    await assertFails(updateDoc(ledgerRef, { amountYen: -500 }))
+    await assertFails(deleteDoc(ledgerRef))
+    await assertFails(setDoc(intruderRef, { ...transaction, transactionId: 'stake-purchase-2' }))
   })
 
   it('keeps import log records immutable', async () => {

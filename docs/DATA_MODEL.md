@@ -112,7 +112,7 @@
 
 ### 3.5 `/purchases/{purchaseId}`
 
-実購入の記録。外部馬券購入処理ではない。Milestone 5で実装する。
+実購入の記録。外部馬券購入処理ではない。詳細は[`SETTLEMENTS.md`](SETTLEMENTS.md)を参照する。
 
 - `sourcePlanId?`
 - `sourcePredictionVersionId`
@@ -123,12 +123,14 @@
 - `totalStakeYen`
 - `idempotencyKey`
 - `correctionOf?`
+- `rootPurchaseId` / `correctionSequence`: 訂正チェーンと有効版の選択
+- `revision`: draftの競合検知
 
 提案内容を直接変更せず、実購入は独立スナップショットとして保存する。確定後の訂正は`correctionOf`を持つ新規レコードにする。
 
 ### 3.6 `/results/{resultId}`
 
-結果JSONとアプリ内編集結果を保存する。Milestone 5で実装する。
+結果JSONとアプリ内編集結果を保存する。
 
 - `status`: `draft` / `confirmed` / `corrected`
 - `payload`: ResultDocument
@@ -136,14 +138,15 @@
 - `importId`
 - `createdAt`
 - `updatedAt`
+- `resultId` / `rootResultId` / `correctionOf` / `correctionSequence`
 
 観測事実（着順・公式払戻・通過順）と解釈（展開評価）を`payload`内で分離する。
 
 ### 3.7 `/bankrollTransactions/{transactionId}`
 
-Phase 2で本格実装する台帳。Phase 1では購入・払戻の一貫性を保つための参照設計だけを維持する。
+Phase 2で本格実装する台帳。Phase 1では購入・払戻・訂正差額をtransactionで記録する。
 
-- `kind`: `deposit` / `withdrawal` / `stake` / `payout` / `adjustment`
+- `kind`: Phase 1では`stake` / `payout` / `adjustment`
 - `amountYen`
 - `referenceId`
 - `idempotencyKey`

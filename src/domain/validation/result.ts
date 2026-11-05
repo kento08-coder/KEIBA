@@ -231,12 +231,15 @@ export const ResultDocumentSchema = z
       })
     }
 
-    if (result.result_status === 'confirmed') {
+    if (
+      result.result_status === 'confirmed' ||
+      result.result_status === 'corrected'
+    ) {
       if (result.sources.length === 0) {
         context.addIssue({
           code: 'custom',
           path: ['sources'],
-          message: '確定結果には確認元のsourceが1件以上必要です。',
+          message: '確定・訂正結果には確認元のsourceが1件以上必要です。',
         })
       }
       result.payouts.forEach((payout, payoutIndex) => {
@@ -244,7 +247,7 @@ export const ResultDocumentSchema = z
           context.addIssue({
             code: 'custom',
             path: ['payouts', payoutIndex, 'official_confirmed'],
-            message: '確定結果の払戻は公式確認済みである必要があります。',
+            message: '確定・訂正結果の払戻は公式確認済みである必要があります。',
           })
         }
       })

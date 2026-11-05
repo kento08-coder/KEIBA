@@ -1,5 +1,10 @@
-import type { PredictionDocument, ResultDocument } from './import'
+import type { PredictionDocument } from './import'
 import type { PurchasePlanSnapshot } from './purchase-plan'
+import type {
+  BankrollTransactionRecord as SettlementBankrollTransactionRecord,
+  PurchaseRecord as SettlementPurchaseRecord,
+  ResultRecordSnapshot,
+} from './settlement'
 
 export type IsoDateTimeString = string
 export type RaceStatus =
@@ -14,6 +19,7 @@ export interface RaceRecord<TTimestamp = IsoDateTimeString> {
   date: string
   distanceM: number
   latestPredictionVersionId: string | null
+  latestResultId?: string | null
   name: string
   organizer: string
   raceId: string
@@ -47,14 +53,14 @@ export interface PredictionVersionRecord<TTimestamp = IsoDateTimeString> {
   versionNumber: number
 }
 
-export interface ResultRecord<TTimestamp = IsoDateTimeString> {
-  contentHash: string
-  createdAt: TTimestamp
-  importId: string
-  payload: ResultDocument
-  status: 'draft' | 'confirmed' | 'corrected'
-  updatedAt: TTimestamp
-}
+export type PurchaseRecord<TTimestamp = IsoDateTimeString> =
+  SettlementPurchaseRecord<TTimestamp>
+
+export type ResultRecord<TTimestamp = IsoDateTimeString> =
+  ResultRecordSnapshot<TTimestamp>
+
+export type BankrollTransactionRecord<TTimestamp = IsoDateTimeString> =
+  SettlementBankrollTransactionRecord<TTimestamp>
 
 export interface ImportLogRecord<TTimestamp = IsoDateTimeString> {
   contentHash: string

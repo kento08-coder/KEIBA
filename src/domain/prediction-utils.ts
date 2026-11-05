@@ -38,6 +38,10 @@ export function hasSamePredictionContent(
 }
 
 export async function hashPredictionDocument(document: PredictionDocument) {
+  return hashDocument(document)
+}
+
+export async function hashDocument(document: unknown) {
   const bytes = new TextEncoder().encode(stableStringify(document))
   const digest = await crypto.subtle.digest('SHA-256', bytes)
   return Array.from(new Uint8Array(digest), (byte) =>

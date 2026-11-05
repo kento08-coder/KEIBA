@@ -15,6 +15,125 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/predictionVersions/$(versionId)).data.status == 'final';
     }
 
+    function purchaseSourceExists(userId, raceId, data) {
+      return (data.sourcePlanId == null
+          || (exists(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/plans/$(data.sourcePlanId))
+            && data.sourcePredictionVersionId == get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/plans/$(data.sourcePlanId)).data.sourcePredictionVersionId))
+        && (data.sourcePredictionVersionId == null
+          || isFinalPredictionVersion(userId, raceId, data.sourcePredictionVersionId));
+    }
+
+    function hasValidPurchaseShape(data, purchaseId, userId, raceId) {
+      return data.keys().hasOnly([
+          'authorUid', 'confirmedAt', 'correctionOf', 'correctionSequence',
+          'createdAt', 'idempotencyKey', 'items', 'memo', 'placedAt',
+          'purchaseId', 'raceId', 'recordedAt', 'revision', 'rootPurchaseId',
+          'sourcePlanId', 'sourcePredictionVersionId', 'status',
+          'totalStakeYen', 'updatedAt'
+        ])
+        && data.authorUid == userId
+        && data.purchaseId == purchaseId
+        && data.purchaseId.matches('^[A-Za-z0-9_-]{8,120}$')
+        && data.raceId == raceId
+        && data.rootPurchaseId is string
+        && data.rootPurchaseId.matches('^[A-Za-z0-9_-]{8,120}$')
+        && data.idempotencyKey is string
+        && data.idempotencyKey.size() >= 8
+        && data.idempotencyKey.size() <= 160
+        && data.items is list
+        && data.items.size() >= 1
+        && data.items.size() <= 100
+        && data.memo is string
+        && data.memo.size() <= 2000
+        && data.placedAt is string
+        && data.placedAt.size() <= 80
+        && data.revision is int
+        && data.revision >= 1
+        && data.correctionSequence is int
+        && data.correctionSequence >= 0
+        && data.totalStakeYen is int
+        && data.totalStakeYen >= 100
+        && data.totalStakeYen <= 10000000
+        && data.totalStakeYen % 100 == 0
+        && data.status in ['draft', 'confirmed', 'corrected']
+        && data.createdAt is timestamp
+        && data.recordedAt is timestamp
+        && data.updatedAt is timestamp
+        && ((data.status == 'draft' && data.confirmedAt == null)
+          || (data.status in ['confirmed', 'corrected'] && data.confirmedAt is timestamp))
+        && purchaseSourceExists(userId, raceId, data);
+    }
+
+    function isValidPurchaseCorrection(userId, raceId, data) {
+      return data.status == 'corrected'
+        && data.correctionOf is string
+        && exists(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/purchases/$(data.correctionOf))
+        && get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/purchases/$(data.correctionOf)).data.status in ['confirmed', 'corrected']
+        && data.rootPurchaseId == get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/purchases/$(data.correctionOf)).data.rootPurchaseId
+        && data.correctionSequence == get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/purchases/$(data.correctionOf)).data.correctionSequence + 1;
+    }
+
+    function hasValidResultShape(data, resultId, userId, raceId) {
+      return data.keys().hasOnly([
+          'authorUid', 'confirmedAt', 'contentHash', 'correctionOf',
+          'correctionSequence', 'createdAt', 'idempotencyKey', 'importId',
+          'payload', 'raceId', 'resultId', 'rootResultId', 'status', 'updatedAt'
+        ])
+        && data.authorUid == userId
+        && data.resultId == resultId
+        && data.resultId.matches('^[A-Za-z0-9_-]{8,120}$')
+        && data.raceId == raceId
+        && data.rootResultId is string
+        && data.rootResultId.matches('^[A-Za-z0-9_-]{8,120}$')
+        && data.contentHash is string
+        && data.contentHash.size() == 64
+        && data.importId is string
+        && data.idempotencyKey is string
+        && data.payload is map
+        && data.payload.race_id == raceId
+        && data.payload.payouts is list
+        && data.payload.payouts.size() <= 1000
+        && data.payload.finishers is list
+        && data.payload.finishers.size() >= 1
+        && data.payload.finishers.size() <= 99
+        && data.correctionSequence is int
+        && data.correctionSequence >= 0
+        && data.status in ['draft', 'confirmed', 'corrected']
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && ((data.status == 'draft' && data.confirmedAt == null)
+          || (data.status in ['confirmed', 'corrected'] && data.confirmedAt is timestamp));
+    }
+
+    function isValidResultCorrection(userId, raceId, data) {
+      return data.status == 'corrected'
+        && data.correctionOf is string
+        && exists(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/results/$(data.correctionOf))
+        && get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/results/$(data.correctionOf)).data.status in ['confirmed', 'corrected']
+        && data.rootResultId == get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/results/$(data.correctionOf)).data.rootResultId
+        && data.correctionSequence == get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/results/$(data.correctionOf)).data.correctionSequence + 1;
+    }
+
+    function hasValidBankrollTransaction(data, transactionId, userId) {
+      return data.keys().hasOnly([
+          'amountYen', 'at', 'authorUid', 'idempotencyKey', 'kind', 'note',
+          'raceId', 'referenceId', 'transactionId'
+        ])
+        && data.transactionId == transactionId
+        && data.authorUid == userId
+        && data.amountYen is int
+        && data.amountYen >= -100000000
+        && data.amountYen <= 100000000
+        && data.at is timestamp
+        && data.kind in ['stake', 'payout', 'adjustment']
+        && data.idempotencyKey is string
+        && data.idempotencyKey.size() >= 8
+        && data.note is string
+        && data.note.size() <= 500
+        && data.raceId is string
+        && data.referenceId is string;
+    }
+
     function hasValidPlanSettings(data) {
       return data.settings is map
         && data.settings.keys().hasOnly([
@@ -160,7 +279,9 @@ service cloud.firestore {
     }
 
     match /users/{userId}/bankrollTransactions/{transactionId} {
-      allow read, create: if isOwner(userId);
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && hasValidBankrollTransaction(request.resource.data, transactionId, userId);
       allow update, delete: if false;
     }
 
@@ -201,20 +322,40 @@ service cloud.firestore {
     match /users/{userId}/races/{raceId}/purchases/{purchaseId} {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId)
-        && request.resource.data.status in ['draft', 'confirmed', 'corrected'];
+        && hasValidPurchaseShape(request.resource.data, purchaseId, userId, raceId)
+        && ((request.resource.data.status in ['draft', 'confirmed']
+            && request.resource.data.correctionOf == null
+            && request.resource.data.correctionSequence == 0
+            && request.resource.data.rootPurchaseId == purchaseId)
+          || isValidPurchaseCorrection(userId, raceId, request.resource.data));
       allow update: if isOwner(userId)
         && resource.data.status == 'draft'
-        && request.resource.data.status in ['draft', 'confirmed'];
+        && request.resource.data.status in ['draft', 'confirmed']
+        && hasValidPurchaseShape(request.resource.data, purchaseId, userId, raceId)
+        && request.resource.data.revision == resource.data.revision + 1
+        && request.resource.data.authorUid == resource.data.authorUid
+        && request.resource.data.rootPurchaseId == resource.data.rootPurchaseId
+        && request.resource.data.correctionOf == resource.data.correctionOf
+        && request.resource.data.correctionSequence == resource.data.correctionSequence;
       allow delete: if isOwner(userId) && resource.data.status == 'draft';
     }
 
     match /users/{userId}/races/{raceId}/results/{resultId} {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId)
-        && request.resource.data.status in ['draft', 'confirmed', 'corrected'];
+        && hasValidResultShape(request.resource.data, resultId, userId, raceId)
+        && ((request.resource.data.status in ['draft', 'confirmed']
+            && request.resource.data.correctionOf == null
+            && request.resource.data.correctionSequence == 0
+            && request.resource.data.rootResultId == resultId)
+          || isValidResultCorrection(userId, raceId, request.resource.data));
       allow update: if isOwner(userId)
         && resource.data.status == 'draft'
-        && request.resource.data.status in ['draft', 'confirmed'];
+        && request.resource.data.status in ['draft', 'confirmed']
+        && hasValidResultShape(request.resource.data, resultId, userId, raceId)
+        && request.resource.data.rootResultId == resource.data.rootResultId
+        && request.resource.data.correctionOf == resource.data.correctionOf
+        && request.resource.data.correctionSequence == resource.data.correctionSequence;
       allow delete: if isOwner(userId) && resource.data.status == 'draft';
     }
 

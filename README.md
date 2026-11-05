@@ -166,6 +166,7 @@ tests/rules/                 # Firestore Security Rulesテスト
 - [`docs/ROADMAP.md`](docs/ROADMAP.md): Phase 1の6マイルストーン
 - [`docs/EXPECTED_VALUE.md`](docs/EXPECTED_VALUE.md): 期待値・展開加重計算仕様
 - [`docs/PURCHASE_PLANS.md`](docs/PURCHASE_PLANS.md): 3方式の資金配分・保存仕様
+- [`docs/SETTLEMENTS.md`](docs/SETTLEMENTS.md): 実購入、結果、訂正履歴、払戻・収支計算
 - [`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md): 依存関係とActionsの確認結果
 - [`schemas/`](schemas/): 生成JSON Schema
 - [`examples/`](examples/): 架空テンプレートとサンプル
