@@ -2,7 +2,7 @@
 
 - 対象: Phase 1 MVP
 - スキーマ版: `1.0.0`
-- 更新日: 2026-11-05
+- 更新日: 2026-11-06
 - 要件ソース: [`REQUIREMENTS.md`](REQUIREMENTS.md)
 
 ## 1. 設計原則
@@ -49,6 +49,9 @@
 | `distanceM` | integer | 距離（m） |
 | `status` | enum | `registered` / `predicting` / `prediction_confirmed` / `purchased` / `result_recorded` |
 | `latestPredictionVersionId` | string \| null | 最新確定予想への参照 |
+| `latestResultId` | string \| null | 最新確定結果への参照 |
+| `activePurchaseIds` | string[] | 現在有効な購入記録ID。最大500件 |
+| `purchaseRevision` | non-negative integer | 購入確定・訂正ごとに+1。結果確定時の競合検知に使用 |
 | `resultStatus` | enum | `none` / `draft` / `confirmed` |
 | `createdAt` | Timestamp | 作成日時 |
 | `updatedAt` | Timestamp | 更新日時 |
@@ -139,6 +142,7 @@
 - `createdAt`
 - `updatedAt`
 - `resultId` / `rootResultId` / `correctionOf` / `correctionSequence`
+- `activePurchaseIds` / `purchaseRevision`: 結果計算に使用した購入集合のスナップショット
 
 観測事実（着順・公式払戻・通過順）と解釈（展開評価）を`payload`内で分離する。
 

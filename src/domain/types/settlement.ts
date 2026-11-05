@@ -34,6 +34,7 @@ export interface PurchaseRecord<TTimestamp = string> {
 }
 
 export interface ResultRecordSnapshot<TTimestamp = string> {
+  activePurchaseIds: string[]
   authorUid: string
   confirmedAt: TTimestamp | null
   contentHash: string
@@ -43,6 +44,7 @@ export interface ResultRecordSnapshot<TTimestamp = string> {
   idempotencyKey: string
   importId: string
   payload: ResultDocument
+  purchaseRevision: number
   raceId: string
   resultId: string
   rootResultId: string

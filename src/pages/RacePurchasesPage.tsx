@@ -53,6 +53,11 @@ export function RacePurchasesPage() {
         <h1 className="page-title mt-2">{race.value.name}｜実購入記録</h1>
         <p className="muted-copy mt-3">購入プランと実購入は分離して保存します。確定後は上書きせず、訂正履歴を追加します。</p>
       </header>
+      {race.value.latestResultId ? (
+        <StatusNotice tone="warning">
+          このレースは結果確定済みです。後から実購入を確定した場合も、最新の確定払戻・返還を同じtransactionで収支台帳へ差分計上します。
+        </StatusNotice>
+      ) : null}
       <PurchaseRecorder
         {...(editedRecord ? {
           initial: editableInput(editedRecord),

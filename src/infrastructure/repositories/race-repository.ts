@@ -184,11 +184,14 @@ export async function createRace(
       throw new DuplicateRaceError('同じ開催情報のレースが既に登録されています。')
     }
     transaction.set(raceRef, {
+      activePurchaseIds: [],
       raceId,
       date: input.date,
       distanceM: input.distanceM,
       latestPredictionVersionId: null,
+      latestResultId: null,
       name: input.name,
+      purchaseRevision: 0,
       organizer: input.organizer,
       raceNumber: input.raceNumber,
       resultStatus: 'none',

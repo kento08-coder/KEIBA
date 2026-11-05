@@ -13,6 +13,7 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  writeBatch,
 } from 'firebase/firestore'
 
 const projectId = 'keiba-rules-test'
@@ -123,6 +124,7 @@ function validPurchaseDocument(
 
 function validResultDocument(resultId = 'result-0001') {
   return {
+    activePurchaseIds: [],
     authorUid: 'owner-a',
     confirmedAt: serverTimestamp(),
     contentHash: 'a'.repeat(64),
@@ -136,6 +138,7 @@ function validResultDocument(resultId = 'result-0001') {
       finishers: [{ horse_number: 1 }],
       payouts: [{ bet_type: 'win' }],
     },
+    purchaseRevision: 0,
     raceId: 'race-1',
     resultId,
     rootResultId: resultId,
@@ -355,16 +358,36 @@ describe('Firestore ownership rules', () => {
       ownerDb,
       'users/owner-a/races/race-1/purchases/confirmed-purchase',
     )
+    const raceRef = doc(ownerDb, 'users/owner-a/races/race-1')
 
+    await assertSucceeds(setDoc(raceRef, {
+      activePurchaseIds: [],
+      latestResultId: null,
+      purchaseRevision: 0,
+      status: 'prediction_confirmed',
+    }))
     await assertSucceeds(setDoc(draftRef, validPurchaseDocument('draft-purchase', 'draft')))
-    await assertSucceeds(setDoc(draftRef, {
+    const confirmDraft = writeBatch(ownerDb)
+    confirmDraft.set(draftRef, {
       ...validPurchaseDocument('draft-purchase', 'confirmed'),
       revision: 2,
-    }))
+    })
+    confirmDraft.update(raceRef, {
+      activePurchaseIds: ['draft-purchase'],
+      purchaseRevision: 1,
+    })
+    await assertSucceeds(confirmDraft.commit())
     await assertFails(updateDoc(draftRef, { totalStakeYen: 500 }))
     await assertFails(deleteDoc(draftRef))
 
-    await assertSucceeds(setDoc(confirmedRef, validPurchaseDocument('confirmed-purchase')))
+    await assertFails(setDoc(confirmedRef, validPurchaseDocument('confirmed-purchase')))
+    const confirmNew = writeBatch(ownerDb)
+    confirmNew.set(confirmedRef, validPurchaseDocument('confirmed-purchase'))
+    confirmNew.update(raceRef, {
+      activePurchaseIds: ['draft-purchase', 'confirmed-purchase'],
+      purchaseRevision: 2,
+    })
+    await assertSucceeds(confirmNew.commit())
     await assertFails(updateDoc(confirmedRef, { totalStakeYen: 500 }))
     await assertFails(deleteDoc(confirmedRef))
   })
@@ -386,7 +409,18 @@ describe('Firestore ownership rules', () => {
     const resultRef = doc(ownerDb, 'users/owner-a/races/race-1/results/result-0001')
     const malformedRef = doc(ownerDb, 'users/owner-a/races/race-1/results/result-malformed')
 
-    await assertSucceeds(setDoc(resultRef, validResultDocument()))
+    const raceRef = doc(ownerDb, 'users/owner-a/races/race-1')
+    await assertSucceeds(setDoc(raceRef, {
+      activePurchaseIds: [],
+      latestResultId: null,
+      purchaseRevision: 0,
+      status: 'purchased',
+    }))
+    await assertFails(setDoc(resultRef, validResultDocument()))
+    const saveResultBatch = writeBatch(ownerDb)
+    saveResultBatch.set(resultRef, validResultDocument())
+    saveResultBatch.update(raceRef, { latestResultId: 'result-0001' })
+    await assertSucceeds(saveResultBatch.commit())
     await assertFails(updateDoc(resultRef, { contentHash: 'changed' }))
     await assertFails(deleteDoc(resultRef))
     await assertFails(setDoc(malformedRef, {

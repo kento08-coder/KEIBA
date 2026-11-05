@@ -1,5 +1,9 @@
 import { z } from 'zod'
 import {
+  hasResultInputPlaceholders,
+  RESULT_INPUT_PENDING_AGENT,
+} from '../result-template'
+import {
   BetTypeSchema,
   ConfidenceSchema,
   commonDocumentShape,
@@ -235,6 +239,20 @@ export const ResultDocumentSchema = z
       result.result_status === 'confirmed' ||
       result.result_status === 'corrected'
     ) {
+      if (result.source_agent === RESULT_INPUT_PENDING_AGENT) {
+        context.addIssue({
+          code: 'custom',
+          path: ['source_agent'],
+          message: '入力待ちテンプレートのまま結果を確定できません。',
+        })
+      }
+      if (result.payouts.length === 0) {
+        context.addIssue({
+          code: 'custom',
+          path: ['payouts'],
+          message: '確定・訂正結果には公式の払戻または返還が1件以上必要です。',
+        })
+      }
       if (result.sources.length === 0) {
         context.addIssue({
           code: 'custom',
@@ -242,6 +260,18 @@ export const ResultDocumentSchema = z
           message: '確定・訂正結果には確認元のsourceが1件以上必要です。',
         })
       }
+      result.sources.forEach((source, sourceIndex) => {
+        if (hasResultInputPlaceholders({
+          source_agent: 'validated-source-agent',
+          sources: [source],
+        })) {
+          context.addIssue({
+            code: 'custom',
+            path: ['sources', sourceIndex],
+            message: 'プレースホルダーの情報源を公式結果として確定できません。',
+          })
+        }
+      })
       result.payouts.forEach((payout, payoutIndex) => {
         if (!payout.official_confirmed) {
           context.addIssue({

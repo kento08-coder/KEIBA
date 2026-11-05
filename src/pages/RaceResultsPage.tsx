@@ -3,36 +3,18 @@ import { ArrowLeft, FileJson, RotateCcw, ShieldCheck } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { StatusNotice } from '../components/StatusNotice'
 import { calculateExpectedValue } from '../domain/calculations/expected-value'
+import { createResultInputTemplate } from '../domain/result-template'
 import {
   calculateRaceSettlement,
   selectEffectivePurchases,
   selectEffectiveResult,
   settlePurchase,
 } from '../domain/calculations/settlement'
-import type { ResultDocument } from '../domain/types/import'
 import { ResultDocumentSchema } from '../domain/validation/result'
 import { useAuth } from '../features/auth/useAuth'
 import { usePurchasePlans, useRace } from '../features/races/use-race-data'
 import { usePurchases, useResults } from '../features/settlements/use-settlement-data'
 import { saveResult } from '../infrastructure/repositories/settlement-repository'
-
-function template(raceId: string): ResultDocument {
-  return {
-    schema_version: '1.0.0',
-    document_type: 'result',
-    race_id: raceId,
-    generated_at: new Date().toISOString(),
-    source_agent: 'manual-entry',
-    sources: [{ id: 'official-source', url: 'https://example.invalid/replace-with-official-result', title: '公式結果（URLを置換）', checked_at: new Date().toISOString() }],
-    notes: '入力テンプレートです。保存前に公式結果へ置き換えてください。',
-    result_status: 'confirmed',
-    finishers: [{ horse_number: 1, frame_number: 1, rank: 1, status: 'finished' }],
-    payouts: [{ bet_type: 'win', horse_numbers: [1], payout_type: 'payout', payout_per_100_yen: 100, official_confirmed: true, source_refs: ['official-source'] }],
-    observed_pace: { label: 'unknown', basis: '手動入力。確認できた事実のみ記録。', verified: false, passing_orders: [] },
-    interpretation: { race_shape: '未入力', confidence: 'unknown' },
-    change_reason: '初回結果登録',
-  }
-}
 
 function yen(value: number | null) {
   return value === null ? '未判定' : `${Math.round(value).toLocaleString()}円`
@@ -46,7 +28,7 @@ export function RaceResultsPage() {
   const purchases = usePurchases(userId, id)
   const results = useResults(userId, id)
   const plans = usePurchasePlans(userId, id)
-  const [jsonText, setJsonText] = useState(() => JSON.stringify(template(id ?? 'race-id'), null, 2))
+  const [jsonText, setJsonText] = useState(() => JSON.stringify(createResultInputTemplate(id ?? 'race-id'), null, 2))
   const [sourceFileName, setSourceFileName] = useState<string | null>(null)
   const [correctionOf, setCorrectionOf] = useState<string | undefined>()
   const [error, setError] = useState<string | null>(null)
@@ -90,7 +72,13 @@ export function RaceResultsPage() {
     }
     setSaving(true)
     try {
-      await saveResult({ activePurchaseIds: purchases.value.map((record) => record.purchaseId), ...(correctionOf ? { originalResultId: correctionOf } : {}), payload: parsed.data, sourceFileName, userId: userId!, })
+      await saveResult({
+        expectedPurchaseRevision: race.value?.purchaseRevision ?? 0,
+        ...(correctionOf ? { originalResultId: correctionOf } : {}),
+        payload: parsed.data,
+        sourceFileName,
+        userId: userId!,
+      })
       setNotice(correctionOf ? '結果の訂正記録を確定しました。' : 'レース結果を確定しました。')
       setCorrectionOf(undefined)
     } catch (caught) {
@@ -111,6 +99,9 @@ export function RaceResultsPage() {
         <p className="eyebrow">Official settlement</p>
         <h1 className="page-title mt-2">{race.value.name}｜結果・払戻</h1>
         <p className="muted-copy mt-3">着順から倍率を推定せず、JRA/NARの確定払戻表を100円当たりで記録してください。</p>
+        <p className="mt-2 text-xs text-muted">
+          購入集合 revision {race.value.purchaseRevision ?? 0} を確認して確定します。別端末で購入が変わった場合は部分保存せず、再読み込みを求めます。
+        </p>
       </header>
       <section className="card-surface space-y-4 p-4 sm:p-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -121,7 +112,7 @@ export function RaceResultsPage() {
         {error ? <StatusNotice tone="error">{error}</StatusNotice> : null}
         {notice ? <StatusNotice tone="success">{notice}</StatusNotice> : null}
         <textarea aria-label="結果JSON" className="field-input min-h-[28rem] font-mono text-xs" spellCheck={false} value={jsonText} onChange={(event) => setJsonText(event.target.value)} />
-        {!parsed.success ? <StatusNotice tone="error">{parsed.error.issues.map((issue) => issue.message).join(' ')}</StatusNotice> : <StatusNotice tone="success">JSON検証に成功しました。払戻はすべて公式確認済みとして保存されます。</StatusNotice>}
+        {!parsed.success ? <StatusNotice tone="error">{parsed.error.issues.map((issue) => issue.message).join(' ')}</StatusNotice> : <StatusNotice tone="warning">JSON形式の検証に成功しました。アプリは情報源を自動確認しません。公式サイトで着順・払戻・返還を確認し、確認済みの内容だけを確定してください。</StatusNotice>}
         <div className="flex justify-end"><button className="button-primary" disabled={saving || !parsed.success} onClick={() => void confirm()} type="button"><ShieldCheck size={16} /> {correctionOf ? '訂正結果を確定' : '結果を確定'}</button></div>
       </section>
 

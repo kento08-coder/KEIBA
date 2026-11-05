@@ -15,6 +15,7 @@ export type RaceStatus =
   | 'result_recorded'
 
 export interface RaceRecord<TTimestamp = IsoDateTimeString> {
+  activePurchaseIds?: string[]
   createdAt: TTimestamp
   date: string
   distanceM: number
@@ -22,6 +23,7 @@ export interface RaceRecord<TTimestamp = IsoDateTimeString> {
   latestResultId?: string | null
   name: string
   organizer: string
+  purchaseRevision?: number
   raceId: string
   raceNumber: number
   resultStatus: 'none' | 'draft' | 'confirmed'

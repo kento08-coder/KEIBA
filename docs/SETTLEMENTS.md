@@ -14,11 +14,17 @@ Milestone 5は実際の馬券購入を実行せず、外部で購入した内容
 
 訂正は元記録を上書きしない。集計時は同じ`rootPurchaseId`の最大`correctionSequence`だけを有効にするため、訂正前後を二重計上しない。購入プランと確定予想への参照は任意だが、設定時は不変スナップショットを参照する。
 
+レース親には`activePurchaseIds`と`purchaseRevision`を保持する。購入確定はIDを追加し、購入訂正は最新版IDだけを置換してrevisionを1進める。古い訂正元は拒否する。結果保存は画面の購入ID一覧を正とせず、transaction内でこの一覧を読み、有効購入ドキュメントをすべて再取得する。結果画面が保持するrevisionと異なる場合、購入追加・訂正との競合として結果・台帳を一切保存せず再読み込みを促す。1レースの有効購入記録は500件を上限とする。
+
+過去レースの後日入力を支援するため、結果確定後の購入追加も許可する。購入金額の負台帳と、最新確定結果に基づく払戻・返還の正台帳を同一transactionで追加する。結果の払戻表が不足する買い目は返戻0円の既知状態として記録し、後日の結果訂正で全有効購入との差額を調整する。
+
 ## 3. 結果と確定払戻
 
 `results/{resultId}`は検証済み`ResultDocument`を`payload`として保持する。同着は同じ`rank`、取消・除外・競走中止は各status、返還は`payout_type=refund`として記録する。払戻・返還は100円当たりの公式金額と出典を必須とする。結果訂正も新規レコードとし、同じルートの最新版だけを採用する。
 
 同一内容の二重登録は、正規化JSONのSHA-256から作る`contentHash`、決定論的`importId`、不変のimport logで拒否する。
+
+初期入力テンプレートは`draft`、空の着順・払戻・情報源、`manual-entry-pending`マーカーを持つため、そのまま確定できない。確定・訂正結果は公式の払戻または返還が1件以上必要で、テンプレートマーカー、`placeholder.invalid`、`[入力待ち]`を含む情報源をZod・repository・JSON Schemaで拒否する。アプリはURL先の真正性を自動確認しない。
 
 ## 4. 的中・返還・未判定
 
@@ -33,7 +39,7 @@ Milestone 5は実際の馬券購入を実行せず、外部で購入した内容
 
 ## 5. 台帳とtransaction
 
-購入確定は負の`stake`、結果確定は正の`payout`を`bankrollTransactions`へ同一Firestore transactionで追加する。訂正は差額だけを`adjustment`として追加する。transaction IDとidempotency keyを決定論的にし、既存ドキュメントがあれば再実行を拒否する。通信失敗時は購入・結果・import log・台帳・レース状態の一部だけが残らない。
+購入確定は負の`stake`、結果確定は正の`payout`を`bankrollTransactions`へ同一Firestore transactionで追加する。結果確定後の購入には購入単位の払戻台帳を追加する。訂正は最新版との差額だけを`adjustment`として追加する。transaction IDとidempotency keyを決定論的にし、既存ドキュメントがあれば再実行を拒否する。通信失敗時は購入・結果・import log・台帳・レース状態の一部だけが残らない。
 
 ## 6. Security Rulesの範囲
 

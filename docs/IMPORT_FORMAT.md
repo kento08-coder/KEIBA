@@ -159,3 +159,5 @@ Milestone 2で、ファイルとテキスト貼付けの両方を同じ`parseAnd
 結果JSONはプレビューとZod検証後に不変スナップショットとして保存する。同一内容はcontent hashとimport logで二重登録を拒否する。訂正は`result_status=corrected`、`correction_of`、変更理由を持つ新規結果とし、元結果を更新しない。
 
 的中判定は確定払戻表の券種・番号組・100円当たり金額を正とする。着順から払戻を推定せず、券種の払戻行が欠けている場合は不的中ではなく未判定とする。詳しくは[`SETTLEMENTS.md`](SETTLEMENTS.md)を参照する。
+
+初期入力テンプレートは`result_status=draft`かつ着順・払戻・情報源が空で、`source_agent=manual-entry-pending`を持つ。未編集テンプレート、`placeholder.invalid`のURL、`[入力待ち]`の情報源タイトルは確定できない。確定・訂正結果には公式確認した払戻または返還を1件以上入力する。アプリは公式サイトの内容を自動照合しないため、`official_confirmed=true`はユーザーが情報源を確認した事実を表す。

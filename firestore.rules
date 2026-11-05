@@ -15,6 +15,50 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/predictionVersions/$(versionId)).data.status == 'final';
     }
 
+    function raceActivePurchaseIds(data) {
+      return 'activePurchaseIds' in data ? data.activePurchaseIds : [];
+    }
+
+    function racePurchaseRevision(data) {
+      return 'purchaseRevision' in data ? data.purchaseRevision : 0;
+    }
+
+    function activatesNewPurchase(userId, raceId, purchaseId) {
+      let before = get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)).data;
+      let after = getAfter(/databases/$(database)/documents/users/$(userId)/races/$(raceId)).data;
+      let beforeIds = raceActivePurchaseIds(before);
+      let afterIds = raceActivePurchaseIds(after);
+      return beforeIds is list
+        && afterIds is list
+        && beforeIds.size() < 500
+        && afterIds.size() == beforeIds.size() + 1
+        && afterIds.toSet().size() == afterIds.size()
+        && !beforeIds.toSet().hasAny([purchaseId])
+        && afterIds.toSet() == beforeIds.toSet().union([purchaseId].toSet())
+        && racePurchaseRevision(after) == racePurchaseRevision(before) + 1;
+    }
+
+    function advancesPurchaseCorrection(userId, raceId, oldId, newId) {
+      let before = get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)).data;
+      let after = getAfter(/databases/$(database)/documents/users/$(userId)/races/$(raceId)).data;
+      let beforeIds = raceActivePurchaseIds(before);
+      let afterIds = raceActivePurchaseIds(after);
+      return beforeIds is list
+        && afterIds is list
+        && beforeIds.toSet().hasAny([oldId])
+        && !beforeIds.toSet().hasAny([newId])
+        && afterIds.size() == beforeIds.size()
+        && afterIds.toSet().size() == afterIds.size()
+        && afterIds.toSet() == beforeIds.toSet().difference([oldId].toSet()).union([newId].toSet())
+        && racePurchaseRevision(after) == racePurchaseRevision(before) + 1;
+    }
+
+    function resultUsesCurrentPurchases(userId, raceId, data) {
+      let race = get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)).data;
+      return data.purchaseRevision == racePurchaseRevision(race)
+        && data.activePurchaseIds == raceActivePurchaseIds(race);
+    }
+
     function purchaseSourceExists(userId, raceId, data) {
       return (data.sourcePlanId == null
           || (exists(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/plans/$(data.sourcePlanId))
@@ -70,14 +114,16 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/purchases/$(data.correctionOf))
         && get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/purchases/$(data.correctionOf)).data.status in ['confirmed', 'corrected']
         && data.rootPurchaseId == get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/purchases/$(data.correctionOf)).data.rootPurchaseId
-        && data.correctionSequence == get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/purchases/$(data.correctionOf)).data.correctionSequence + 1;
+        && data.correctionSequence == get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/purchases/$(data.correctionOf)).data.correctionSequence + 1
+        && advancesPurchaseCorrection(userId, raceId, data.correctionOf, data.purchaseId);
     }
 
     function hasValidResultShape(data, resultId, userId, raceId) {
       return data.keys().hasOnly([
           'authorUid', 'confirmedAt', 'contentHash', 'correctionOf',
           'correctionSequence', 'createdAt', 'idempotencyKey', 'importId',
-          'payload', 'raceId', 'resultId', 'rootResultId', 'status', 'updatedAt'
+          'payload', 'purchaseRevision', 'raceId', 'resultId', 'rootResultId',
+          'status', 'updatedAt', 'activePurchaseIds'
         ])
         && data.authorUid == userId
         && data.resultId == resultId
@@ -96,6 +142,11 @@ service cloud.firestore {
         && data.payload.finishers is list
         && data.payload.finishers.size() >= 1
         && data.payload.finishers.size() <= 99
+        && data.activePurchaseIds is list
+        && data.activePurchaseIds.size() <= 500
+        && data.activePurchaseIds.toSet().size() == data.activePurchaseIds.size()
+        && data.purchaseRevision is int
+        && data.purchaseRevision >= 0
         && data.correctionSequence is int
         && data.correctionSequence >= 0
         && data.status in ['draft', 'confirmed', 'corrected']
@@ -111,7 +162,9 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/results/$(data.correctionOf))
         && get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/results/$(data.correctionOf)).data.status in ['confirmed', 'corrected']
         && data.rootResultId == get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/results/$(data.correctionOf)).data.rootResultId
-        && data.correctionSequence == get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/results/$(data.correctionOf)).data.correctionSequence + 1;
+        && data.correctionSequence == get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/results/$(data.correctionOf)).data.correctionSequence + 1
+        && get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)).data.latestResultId == data.correctionOf
+        && getAfter(/databases/$(database)/documents/users/$(userId)/races/$(raceId)).data.latestResultId == data.resultId;
     }
 
     function hasValidBankrollTransaction(data, transactionId, userId) {
@@ -323,10 +376,15 @@ service cloud.firestore {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId)
         && hasValidPurchaseShape(request.resource.data, purchaseId, userId, raceId)
-        && ((request.resource.data.status in ['draft', 'confirmed']
+        && ((request.resource.data.status == 'draft'
             && request.resource.data.correctionOf == null
             && request.resource.data.correctionSequence == 0
             && request.resource.data.rootPurchaseId == purchaseId)
+          || (request.resource.data.status == 'confirmed'
+            && request.resource.data.correctionOf == null
+            && request.resource.data.correctionSequence == 0
+            && request.resource.data.rootPurchaseId == purchaseId
+            && activatesNewPurchase(userId, raceId, purchaseId))
           || isValidPurchaseCorrection(userId, raceId, request.resource.data));
       allow update: if isOwner(userId)
         && resource.data.status == 'draft'
@@ -336,7 +394,9 @@ service cloud.firestore {
         && request.resource.data.authorUid == resource.data.authorUid
         && request.resource.data.rootPurchaseId == resource.data.rootPurchaseId
         && request.resource.data.correctionOf == resource.data.correctionOf
-        && request.resource.data.correctionSequence == resource.data.correctionSequence;
+        && request.resource.data.correctionSequence == resource.data.correctionSequence
+        && (request.resource.data.status == 'draft'
+          || activatesNewPurchase(userId, raceId, purchaseId));
       allow delete: if isOwner(userId) && resource.data.status == 'draft';
     }
 
@@ -344,10 +404,18 @@ service cloud.firestore {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId)
         && hasValidResultShape(request.resource.data, resultId, userId, raceId)
-        && ((request.resource.data.status in ['draft', 'confirmed']
+        && resultUsesCurrentPurchases(userId, raceId, request.resource.data)
+        && ((request.resource.data.status == 'draft'
             && request.resource.data.correctionOf == null
             && request.resource.data.correctionSequence == 0
             && request.resource.data.rootResultId == resultId)
+          || (request.resource.data.status == 'confirmed'
+            && request.resource.data.correctionOf == null
+            && request.resource.data.correctionSequence == 0
+            && request.resource.data.rootResultId == resultId
+            && (!('latestResultId' in get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)).data)
+              || get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)).data.latestResultId == null)
+            && getAfter(/databases/$(database)/documents/users/$(userId)/races/$(raceId)).data.latestResultId == resultId)
           || isValidResultCorrection(userId, raceId, request.resource.data));
       allow update: if isOwner(userId)
         && resource.data.status == 'draft'

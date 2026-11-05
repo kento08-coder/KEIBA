@@ -14,6 +14,7 @@ import {
   settlePurchase,
 } from '../../domain/calculations/settlement'
 import { hashDocument } from '../../domain/prediction-utils'
+import { hasResultInputPlaceholders } from '../../domain/result-template'
 import type {
   ImportLogRecord,
   PredictionVersionRecord,
@@ -87,6 +88,32 @@ function purchaseTotal(input: PurchaseInput) {
   return input.items.reduce((total, item) => total + item.stakeYen, 0)
 }
 
+const MAX_ACTIVE_PURCHASES_PER_RACE = 500
+
+function purchaseAggregateState(race: RaceRecord<unknown>) {
+  const activePurchaseIds = race.activePurchaseIds ?? []
+  const purchaseRevision = race.purchaseRevision ?? 0
+  if (
+    !Number.isInteger(purchaseRevision) ||
+    purchaseRevision < 0 ||
+    activePurchaseIds.length > MAX_ACTIVE_PURCHASES_PER_RACE ||
+    new Set(activePurchaseIds).size !== activePurchaseIds.length
+  ) {
+    throw new SettlementConflictError(
+      '購入記録の集計状態が不正です。レースを再読み込みしてください。',
+    )
+  }
+  return { activePurchaseIds, purchaseRevision }
+}
+
+function returnedYenForPurchase(
+  purchase: FirestorePurchase,
+  result: FirestoreResult,
+) {
+  const settlement = settlePurchase(purchase, result.payload)
+  return settlement.totalPayoutYen + settlement.totalRefundYen
+}
+
 export async function savePurchase(input: {
   data: PurchaseInput
   database?: Firestore
@@ -118,6 +145,8 @@ export async function savePurchase(input: {
     if (!raceSnapshot.exists()) {
       throw new SettlementRepositoryError('対象レースが見つかりません。')
     }
+    const race = raceSnapshot.data() as RaceRecord<unknown>
+    const aggregate = purchaseAggregateState(race)
     if (planRef && !planSnapshot?.exists()) {
       throw new SettlementRepositoryError('元の購入プランが見つかりません。')
     }
@@ -150,13 +179,60 @@ export async function savePurchase(input: {
     if (input.status === 'confirmed' && ledgerSnapshot.exists()) {
       throw new DuplicateSettlementError('購入金額は既に収支台帳へ記録されています。')
     }
+    if (
+      input.status === 'confirmed' &&
+      aggregate.activePurchaseIds.includes(data.purchaseId)
+    ) {
+      throw new DuplicateSettlementError('同じ購入記録は既に有効化されています。')
+    }
+    if (
+      input.status === 'confirmed' &&
+      aggregate.activePurchaseIds.length >= MAX_ACTIVE_PURCHASES_PER_RACE
+    ) {
+      throw new SettlementRepositoryError(
+        `1レースの有効購入記録は${MAX_ACTIVE_PURCHASES_PER_RACE}件までです。`,
+      )
+    }
+
+    const activeResultRef =
+      input.status === 'confirmed' && race.latestResultId
+        ? doc(
+            db,
+            ...racePath(input.userId, data.raceId),
+            'results',
+            race.latestResultId,
+          )
+        : null
+    const lateReturnRef = activeResultRef
+      ? doc(
+          db,
+          'users',
+          input.userId,
+          'bankrollTransactions',
+          `return-purchase-${data.purchaseId}-${race.latestResultId}`,
+        )
+      : null
+    const [activeResultSnapshot, lateReturnSnapshot] = await Promise.all([
+      activeResultRef ? transaction.get(activeResultRef) : Promise.resolve(null),
+      lateReturnRef ? transaction.get(lateReturnRef) : Promise.resolve(null),
+    ])
+    if (activeResultRef && !activeResultSnapshot?.exists()) {
+      throw new SettlementConflictError(
+        '最新の確定結果を確認できません。レースを再読み込みしてください。',
+      )
+    }
+    if (lateReturnSnapshot?.exists()) {
+      throw new DuplicateSettlementError(
+        'この購入記録の払戻・返還は既に台帳へ記録されています。',
+      )
+    }
 
     const revision = purchaseSnapshot.exists()
       ? (purchaseSnapshot.data() as FirestorePurchase).revision + 1
       : 1
     const totalStakeYen = purchaseTotal(data)
     const now = serverTimestamp()
-    transaction.set(purchaseRef, {
+    const purchaseRecord = {
       ...data,
       authorUid: input.userId,
       confirmedAt: input.status === 'confirmed' ? now : null,
@@ -171,7 +247,8 @@ export async function savePurchase(input: {
       status: input.status,
       totalStakeYen,
       updatedAt: now,
-    })
+    }
+    transaction.set(purchaseRef, purchaseRecord)
     if (input.status === 'confirmed') {
       transaction.set(ledgerRef, {
         amountYen: -totalStakeYen,
@@ -184,9 +261,39 @@ export async function savePurchase(input: {
         referenceId: data.purchaseId,
         transactionId: ledgerRef.id,
       })
-      transaction.update(raceRef, { status: 'purchased', updatedAt: now })
+      if (activeResultSnapshot?.exists() && lateReturnRef) {
+        const activeResult = activeResultSnapshot.data() as FirestoreResult
+        const returnedYen = returnedYenForPurchase(
+          purchaseRecord as unknown as FirestorePurchase,
+          activeResult,
+        )
+        transaction.set(lateReturnRef, {
+          amountYen: returnedYen,
+          at: now,
+          authorUid: input.userId,
+          idempotencyKey: lateReturnRef.id,
+          kind: 'payout',
+          note: '結果確定後に追加した購入の確定払戻・返還',
+          raceId: data.raceId,
+          referenceId: data.purchaseId,
+          transactionId: lateReturnRef.id,
+        })
+      }
+      transaction.update(raceRef, {
+        activePurchaseIds: [...aggregate.activePurchaseIds, data.purchaseId],
+        purchaseRevision: aggregate.purchaseRevision + 1,
+        status: activeResultSnapshot?.exists() ? 'result_recorded' : 'purchased',
+        updatedAt: now,
+      })
     }
-    return { purchaseId: data.purchaseId, revision }
+    return {
+      purchaseId: data.purchaseId,
+      purchaseRevision:
+        input.status === 'confirmed'
+          ? aggregate.purchaseRevision + 1
+          : aggregate.purchaseRevision,
+      revision,
+    }
   })
 }
 
@@ -215,6 +322,12 @@ export async function correctPurchase(input: {
       throw new SettlementRepositoryError('対象レースが見つかりません。')
     }
     const race = raceSnapshot.data() as RaceRecord<unknown>
+    const aggregate = purchaseAggregateState(race)
+    if (!aggregate.activePurchaseIds.includes(original.purchaseId)) {
+      throw new SettlementConflictError(
+        '訂正元は最新の有効購入記録ではありません。レースを再読み込みしてください。',
+      )
+    }
     const activeResultRef = race.latestResultId
       ? doc(
           db,
@@ -226,6 +339,11 @@ export async function correctPurchase(input: {
     const activeResultSnapshot = activeResultRef
       ? await transaction.get(activeResultRef)
       : null
+    if (activeResultRef && !activeResultSnapshot?.exists()) {
+      throw new SettlementConflictError(
+        '最新の確定結果を確認できません。レースを再読み込みしてください。',
+      )
+    }
     const correctionSequence = original.correctionSequence + 1
     const purchaseId = `${original.rootPurchaseId}-c${correctionSequence}`
     const data = parsePurchase({
@@ -298,6 +416,13 @@ export async function correctPurchase(input: {
       referenceId: purchaseId,
       transactionId: ledgerRef.id,
     })
+    transaction.update(raceRef, {
+      activePurchaseIds: aggregate.activePurchaseIds.map((purchaseId) =>
+        purchaseId === original.purchaseId ? data.purchaseId : purchaseId,
+      ),
+      purchaseRevision: aggregate.purchaseRevision + 1,
+      updatedAt: now,
+    })
     return purchaseId
   })
 }
@@ -310,12 +435,17 @@ function parseResult(payload: ResultDocument) {
   if (parsed.data.result_status === 'draft') {
     throw new SettlementRepositoryError('結果を確定する前にresult_statusをconfirmedにしてください。')
   }
+  if (hasResultInputPlaceholders(parsed.data)) {
+    throw new SettlementRepositoryError(
+      '入力待ちテンプレートやプレースホルダーURLは確定保存できません。',
+    )
+  }
   return parsed.data
 }
 
 export async function saveResult(input: {
-  activePurchaseIds: string[]
   database?: Firestore
+  expectedPurchaseRevision: number
   originalResultId?: string
   payload: ResultDocument
   sourceFileName: string | null
@@ -339,21 +469,24 @@ export async function saveResult(input: {
   }
   const contentHash = await hashDocument(payload)
   const raceRef = doc(db, ...racePath(input.userId, payload.race_id))
-  const purchaseRefs = input.activePurchaseIds.map((purchaseId) =>
-    doc(db, ...racePath(input.userId, payload.race_id), 'purchases', purchaseId),
-  )
   const originalRef = input.originalResultId
     ? doc(db, ...racePath(input.userId, payload.race_id), 'results', input.originalResultId)
     : null
 
   return runTransaction(db, async (transaction) => {
-    const [raceSnapshot, originalSnapshot, ...purchaseSnapshots] = await Promise.all([
+    const [raceSnapshot, originalSnapshot] = await Promise.all([
       transaction.get(raceRef),
       originalRef ? transaction.get(originalRef) : Promise.resolve(null),
-      ...purchaseRefs.map((reference) => transaction.get(reference)),
     ])
     if (!raceSnapshot.exists()) {
       throw new SettlementRepositoryError('対象レースが見つかりません。')
+    }
+    const race = raceSnapshot.data() as RaceRecord<unknown>
+    const aggregate = purchaseAggregateState(race)
+    if (aggregate.purchaseRevision !== input.expectedPurchaseRevision) {
+      throw new SettlementConflictError(
+        '購入記録が別の端末で更新されました。最新状態を読み直してから結果を確定してください。',
+      )
     }
     const original = originalSnapshot?.exists()
       ? (originalSnapshot.data() as FirestoreResult)
@@ -361,6 +494,59 @@ export async function saveResult(input: {
     if (input.originalResultId && !original) {
       throw new SettlementRepositoryError('訂正元のレース結果が見つかりません。')
     }
+    if (input.originalResultId) {
+      if (race.latestResultId !== input.originalResultId) {
+        throw new SettlementConflictError(
+          '訂正元は最新の確定結果ではありません。最新結果を読み直してください。',
+        )
+      }
+    } else if (race.latestResultId) {
+      throw new SettlementConflictError(
+        'このレースには確定結果があります。最新結果から訂正を開始してください。',
+      )
+    }
+
+    const purchaseRefs = aggregate.activePurchaseIds.map((purchaseId) =>
+      doc(
+        db,
+        ...racePath(input.userId, payload.race_id),
+        'purchases',
+        purchaseId,
+      ),
+    )
+    const purchaseSnapshots = await Promise.all(
+      purchaseRefs.map((reference) => transaction.get(reference)),
+    )
+    const purchases = purchaseSnapshots.map((snapshot, index) => {
+      if (!snapshot.exists()) {
+        throw new SettlementConflictError(
+          '有効購入記録の一部が見つかりません。再読み込みしてください。',
+        )
+      }
+      const purchase = snapshot.data() as FirestorePurchase
+      if (
+        purchase.purchaseId !== aggregate.activePurchaseIds[index] ||
+        purchase.status === 'draft'
+      ) {
+        throw new SettlementConflictError(
+          '有効購入記録とレース集計が一致しません。再読み込みしてください。',
+        )
+      }
+      return purchase
+    })
+    const selectedPurchases = selectEffectivePurchases(purchases)
+    if (
+      selectedPurchases.length !== aggregate.activePurchaseIds.length ||
+      selectedPurchases.some(
+        (purchase) =>
+          !aggregate.activePurchaseIds.includes(purchase.purchaseId),
+      )
+    ) {
+      throw new SettlementConflictError(
+        '購入訂正チェーンの最新版が一致しません。再読み込みしてください。',
+      )
+    }
+
     const correctionSequence = original ? original.correctionSequence + 1 : 0
     const rootResultId = original?.rootResultId ?? `result-${contentHash.slice(0, 24)}`
     const resultId = original ? `${rootResultId}-c${correctionSequence}` : rootResultId
@@ -376,20 +562,14 @@ export async function saveResult(input: {
     if (resultSnapshot.exists() || importSnapshot.exists() || ledgerSnapshot.exists()) {
       throw new DuplicateSettlementError('同じレース結果は既に登録されています。')
     }
-    const purchases = purchaseSnapshots
-      .filter((snapshot) => snapshot.exists())
-      .map((snapshot) => snapshot.data() as FirestorePurchase)
-    if (purchases.length !== purchaseRefs.length) {
-      throw new SettlementRepositoryError('参照する購入記録が見つかりません。')
-    }
-    const activePurchases = selectEffectivePurchases(purchases)
-    const summary = calculateRaceSettlement(activePurchases, payload)
+    const summary = calculateRaceSettlement(selectedPurchases, payload)
     const previousSummary = original
-      ? calculateRaceSettlement(activePurchases, original.payload)
+      ? calculateRaceSettlement(selectedPurchases, original.payload)
       : null
     const returnDelta = summary.returnedYen - (previousSummary?.returnedYen ?? 0)
     const now = serverTimestamp()
     transaction.set(resultRef, {
+      activePurchaseIds: aggregate.activePurchaseIds,
       authorUid: input.userId,
       confirmedAt: now,
       contentHash,
@@ -399,6 +579,7 @@ export async function saveResult(input: {
       idempotencyKey: importId,
       importId,
       payload,
+      purchaseRevision: aggregate.purchaseRevision,
       raceId: payload.race_id,
       resultId,
       rootResultId,
