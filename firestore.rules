@@ -23,6 +23,47 @@ service cloud.firestore {
       return 'purchaseRevision' in data ? data.purchaseRevision : 0;
     }
 
+    function raceLatestPurchaseId(data) {
+      return 'latestPurchaseId' in data ? data.latestPurchaseId : null;
+    }
+
+    function hasValidRacePurchaseAggregateUpdate(userId, raceId, before, after) {
+      let beforeIds = raceActivePurchaseIds(before);
+      let afterIds = raceActivePurchaseIds(after);
+      let beforeRevision = racePurchaseRevision(before);
+      let afterRevision = racePurchaseRevision(after);
+      let latestId = raceLatestPurchaseId(after);
+      return (
+          afterIds == beforeIds
+          && afterRevision == beforeRevision
+          && raceLatestPurchaseId(after) == raceLatestPurchaseId(before)
+        ) || (
+          beforeIds is list
+          && afterIds is list
+          && afterIds.size() <= 500
+          && afterIds.toSet().size() == afterIds.size()
+          && afterRevision == beforeRevision + 1
+          && latestId is string
+          && afterIds.toSet().hasAny([latestId])
+          && existsAfter(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/purchases/$(latestId))
+          && getAfter(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/purchases/$(latestId)).data.purchaseId == latestId
+          && (
+            (
+              afterIds.size() == beforeIds.size() + 1
+              && afterIds.toSet() == beforeIds.toSet().union([latestId].toSet())
+              && getAfter(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/purchases/$(latestId)).data.status == 'confirmed'
+              && getAfter(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/purchases/$(latestId)).data.correctionOf == null
+            ) || (
+              afterIds.size() == beforeIds.size()
+              && beforeIds.toSet().difference(afterIds.toSet()).size() == 1
+              && afterIds.toSet().difference(beforeIds.toSet()).size() == 1
+              && getAfter(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/purchases/$(latestId)).data.status == 'corrected'
+              && beforeIds.toSet().hasAny([getAfter(/databases/$(database)/documents/users/$(userId)/races/$(raceId)/purchases/$(latestId)).data.correctionOf])
+            )
+          )
+        );
+    }
+
     function activatesNewPurchase(userId, raceId, purchaseId) {
       let before = get(/databases/$(database)/documents/users/$(userId)/races/$(raceId)).data;
       let after = getAfter(/databases/$(database)/documents/users/$(userId)/races/$(raceId)).data;
@@ -35,6 +76,7 @@ service cloud.firestore {
         && afterIds.toSet().size() == afterIds.size()
         && !beforeIds.toSet().hasAny([purchaseId])
         && afterIds.toSet() == beforeIds.toSet().union([purchaseId].toSet())
+        && raceLatestPurchaseId(after) == purchaseId
         && racePurchaseRevision(after) == racePurchaseRevision(before) + 1;
     }
 
@@ -50,6 +92,7 @@ service cloud.firestore {
         && afterIds.size() == beforeIds.size()
         && afterIds.toSet().size() == afterIds.size()
         && afterIds.toSet() == beforeIds.toSet().difference([oldId].toSet()).union([newId].toSet())
+        && raceLatestPurchaseId(after) == newId
         && racePurchaseRevision(after) == racePurchaseRevision(before) + 1;
     }
 
@@ -339,7 +382,15 @@ service cloud.firestore {
     }
 
     match /users/{userId}/races/{raceId} {
-      allow read, write: if isOwner(userId);
+      allow read, create: if isOwner(userId);
+      allow update: if isOwner(userId)
+        && hasValidRacePurchaseAggregateUpdate(
+          userId,
+          raceId,
+          resource.data,
+          request.resource.data
+        );
+      allow delete: if isOwner(userId);
     }
 
     match /users/{userId}/races/{raceId}/drafts/{draftId} {

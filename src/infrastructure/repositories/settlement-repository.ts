@@ -281,6 +281,7 @@ export async function savePurchase(input: {
       }
       transaction.update(raceRef, {
         activePurchaseIds: [...aggregate.activePurchaseIds, data.purchaseId],
+        latestPurchaseId: data.purchaseId,
         purchaseRevision: aggregate.purchaseRevision + 1,
         status: activeResultSnapshot?.exists() ? 'result_recorded' : 'purchased',
         updatedAt: now,
@@ -420,6 +421,7 @@ export async function correctPurchase(input: {
       activePurchaseIds: aggregate.activePurchaseIds.map((purchaseId) =>
         purchaseId === original.purchaseId ? data.purchaseId : purchaseId,
       ),
+      latestPurchaseId: data.purchaseId,
       purchaseRevision: aggregate.purchaseRevision + 1,
       updatedAt: now,
     })

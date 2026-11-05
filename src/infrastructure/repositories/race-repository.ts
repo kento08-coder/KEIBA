@@ -189,6 +189,7 @@ export async function createRace(
       date: input.date,
       distanceM: input.distanceM,
       latestPredictionVersionId: null,
+      latestPurchaseId: null,
       latestResultId: null,
       name: input.name,
       purchaseRevision: 0,

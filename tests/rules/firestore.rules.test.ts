@@ -362,6 +362,7 @@ describe('Firestore ownership rules', () => {
 
     await assertSucceeds(setDoc(raceRef, {
       activePurchaseIds: [],
+      latestPurchaseId: null,
       latestResultId: null,
       purchaseRevision: 0,
       status: 'prediction_confirmed',
@@ -374,6 +375,7 @@ describe('Firestore ownership rules', () => {
     })
     confirmDraft.update(raceRef, {
       activePurchaseIds: ['draft-purchase'],
+      latestPurchaseId: 'draft-purchase',
       purchaseRevision: 1,
     })
     await assertSucceeds(confirmDraft.commit())
@@ -385,6 +387,7 @@ describe('Firestore ownership rules', () => {
     confirmNew.set(confirmedRef, validPurchaseDocument('confirmed-purchase'))
     confirmNew.update(raceRef, {
       activePurchaseIds: ['draft-purchase', 'confirmed-purchase'],
+      latestPurchaseId: 'confirmed-purchase',
       purchaseRevision: 2,
     })
     await assertSucceeds(confirmNew.commit())
@@ -404,6 +407,24 @@ describe('Firestore ownership rules', () => {
     }))
   })
 
+  it('rejects direct tampering with the race purchase aggregate', async () => {
+    const ownerDb = testEnvironment.authenticatedContext('owner-a').firestore()
+    const raceRef = doc(ownerDb, 'users/owner-a/races/race-1')
+    await assertSucceeds(setDoc(raceRef, {
+      activePurchaseIds: [],
+      latestPurchaseId: null,
+      purchaseRevision: 0,
+      status: 'prediction_confirmed',
+    }))
+
+    await assertFails(updateDoc(raceRef, {
+      activePurchaseIds: ['missing-purchase'],
+      latestPurchaseId: 'missing-purchase',
+      purchaseRevision: 1,
+    }))
+    await assertFails(updateDoc(raceRef, { purchaseRevision: 2 }))
+  })
+
   it('keeps confirmed results immutable and rejects malformed result fields', async () => {
     const ownerDb = testEnvironment.authenticatedContext('owner-a').firestore()
     const resultRef = doc(ownerDb, 'users/owner-a/races/race-1/results/result-0001')
@@ -412,6 +433,7 @@ describe('Firestore ownership rules', () => {
     const raceRef = doc(ownerDb, 'users/owner-a/races/race-1')
     await assertSucceeds(setDoc(raceRef, {
       activePurchaseIds: [],
+      latestPurchaseId: null,
       latestResultId: null,
       purchaseRevision: 0,
       status: 'purchased',

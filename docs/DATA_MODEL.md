@@ -49,6 +49,7 @@
 | `distanceM` | integer | 距離（m） |
 | `status` | enum | `registered` / `predicting` / `prediction_confirmed` / `purchased` / `result_recorded` |
 | `latestPredictionVersionId` | string \| null | 最新確定予想への参照 |
+| `latestPurchaseId` | string \| null | 直近の購入確定・訂正。Rulesで集約更新と購入ドキュメントを突合 |
 | `latestResultId` | string \| null | 最新確定結果への参照 |
 | `activePurchaseIds` | string[] | 現在有効な購入記録ID。最大500件 |
 | `purchaseRevision` | non-negative integer | 購入確定・訂正ごとに+1。結果確定時の競合検知に使用 |

@@ -20,6 +20,7 @@ export interface RaceRecord<TTimestamp = IsoDateTimeString> {
   date: string
   distanceM: number
   latestPredictionVersionId: string | null
+  latestPurchaseId?: string | null
   latestResultId?: string | null
   name: string
   organizer: string

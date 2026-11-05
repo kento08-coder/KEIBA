@@ -39,6 +39,7 @@ beforeEach(async () => {
   await environment.withSecurityRulesDisabled(async (context) => {
     await setDoc(doc(context.firestore(), `users/owner-a/races/${raceId}`), {
       activePurchaseIds: [],
+      latestPurchaseId: null,
       latestResultId: null,
       purchaseRevision: 0,
       raceId,
