@@ -2,7 +2,7 @@
 
 要件ソースは[`REQUIREMENTS.md`](REQUIREMENTS.md)。各マイルストーンは個別PRで完了し、確認後に次へ進む。
 
-## Milestone 1 — データモデル・JSONスキーマ（今回）
+## Milestone 1 — データモデル・JSONスキーマ（完了）
 
 - Firestoreコレクションと不変性の設計
 - prediction/resultのTypeScript型・Zodスキーマ
@@ -11,7 +11,7 @@
 - 正常系・異常系・警告のユニットテスト
 - 既知コレクション限定のSecurity Rulesと確定予想の不変化
 
-## Milestone 2 — レース・予想管理
+## Milestone 2 — レース・予想管理（今回）
 
 - `features/races`、`features/predictions`、薄いFirestore repository層
 - レース一覧・詳細・登録

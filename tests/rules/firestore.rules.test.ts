@@ -39,7 +39,7 @@ describe('Firestore ownership rules', () => {
     await assertSucceeds(getDoc(profileRef))
   })
 
-  it('allows an owner to create and update a race draft', async () => {
+  it('allows sequential draft revisions and rejects stale writes or deletion', async () => {
     const ownerDb = testEnvironment.authenticatedContext('owner-a').firestore()
     const raceRef = doc(ownerDb, 'users/owner-a/races/race-1')
     const draftRef = doc(
@@ -48,8 +48,22 @@ describe('Firestore ownership rules', () => {
     )
 
     await assertSucceeds(setDoc(raceRef, { status: 'predicting' }))
-    await assertSucceeds(setDoc(draftRef, { revision: 0 }))
-    await assertSucceeds(updateDoc(draftRef, { revision: 1 }))
+    await assertSucceeds(setDoc(draftRef, { revision: 1 }))
+    await assertSucceeds(updateDoc(draftRef, { revision: 2 }))
+    await assertFails(updateDoc(draftRef, { revision: 4 }))
+    await assertFails(updateDoc(draftRef, { payload: { source: 'stale' } }))
+    await assertFails(deleteDoc(draftRef))
+  })
+
+  it('rejects a draft that does not start at revision one', async () => {
+    const ownerDb = testEnvironment.authenticatedContext('owner-a').firestore()
+    const draftRef = doc(
+      ownerDb,
+      'users/owner-a/races/race-1/drafts/current',
+    )
+
+    await assertFails(setDoc(draftRef, { revision: 0 }))
+    await assertFails(setDoc(draftRef, { revision: 2 }))
   })
 
   it('allows final prediction creation but rejects later update and delete', async () => {

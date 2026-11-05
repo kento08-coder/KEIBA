@@ -77,13 +77,13 @@
 | フィールド | 型 | 内容 |
 |---|---|---|
 | `baseVersionId` | string \| null | 編集元の確定版 |
-| `revision` | non-negative integer | 楽観ロック用リビジョン |
+| `revision` | positive integer | 楽観ロック用リビジョン。初回保存は1、以後1ずつ加算 |
 | `lastEditedAt` | Timestamp | 最終編集日時 |
 | `lastEditedByClient` | string | 端末・タブ識別子 |
 | `schemaVersion` | literal `1.0.0` | スキーマ版 |
 | `payload` | PredictionDocument | 編集中スナップショット |
 
-保存時はtransaction内で現在の`revision`を確認し、競合時に黙って上書きしない。
+保存時はtransaction内で現在の`revision`を確認し、競合時に黙って上書きしない。Security Rulesでも初回`revision=1`と更新ごとの`+1`を要求し、下書きの削除を拒否する。
 
 ### 3.4 `/plans/{planId}`
 

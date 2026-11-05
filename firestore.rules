@@ -37,7 +37,17 @@ service cloud.firestore {
     }
 
     match /users/{userId}/races/{raceId}/drafts/{draftId} {
-      allow read, write: if isOwner(userId) && draftId == 'current';
+      allow read: if isOwner(userId) && draftId == 'current';
+      allow create: if isOwner(userId)
+        && draftId == 'current'
+        && request.resource.data.revision is int
+        && request.resource.data.revision == 1;
+      allow update: if isOwner(userId)
+        && draftId == 'current'
+        && request.resource.data.revision is int
+        && resource.data.revision is int
+        && request.resource.data.revision == resource.data.revision + 1;
+      allow delete: if false;
     }
 
     match /users/{userId}/races/{raceId}/predictionVersions/{versionId} {

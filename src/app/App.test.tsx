@@ -14,10 +14,12 @@ function renderRoute(route: string) {
 }
 
 describe('application routes', () => {
-  it('renders the home dashboard with an explicit sample-data label', () => {
+  it('renders the home dashboard with an explicit sample-data label', async () => {
     renderRoute('/')
 
-    expect(screen.getByRole('heading', { name: 'ホーム' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'ホーム' }, { timeout: 10_000 }),
+    ).toBeInTheDocument()
     expect(screen.getAllByText('サンプルデータ').length).toBeGreaterThan(0)
     expect(
       screen.getByRole('navigation', { name: 'モバイルナビゲーション' }),
@@ -26,18 +28,23 @@ describe('application routes', () => {
 
   it.each([
     ['/races', 'レース'],
+    ['/races/race-1/import', '予想JSONを取り込む'],
     ['/purchases', '購入'],
     ['/analytics', '分析'],
     ['/settings', '設定'],
-  ])('renders %s route', (route, heading) => {
+  ])('renders %s route', async (route, heading) => {
     renderRoute(route)
 
-    expect(screen.getByRole('heading', { name: heading })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: heading }, { timeout: 10_000 }),
+    ).toBeInTheDocument()
   })
 
-  it('redirects unknown paths to home', () => {
+  it('redirects unknown paths to home', async () => {
     renderRoute('/not-found')
 
-    expect(screen.getByRole('heading', { name: 'ホーム' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: 'ホーム' }, { timeout: 10_000 }),
+    ).toBeInTheDocument()
   })
 })
