@@ -99,7 +99,7 @@ Zodスキーマをランタイム検証の正とする。生成JSON Schemaは外
 
 - `payout_type=payout`: 的中払戻
 - `payout_type=refund`: 取消等の返還
-- `result_status=confirmed`では全払戻の`official_confirmed=true`を必須とする。
+- `result_status=confirmed`または`corrected`では全払戻の`official_confirmed=true`と1件以上の出典を必須とする。
 - 枠連の番号は実際に出走した馬の枠番に存在し、ゾロ目は取消・除外を除いて同じ枠に2頭以上いる場合だけ有効。
 - `source_refs`は券種にかかわらず`sources[]`に存在するIDまたはURLを指定する。
 - 公式情報に基づかない推定払戻は登録しない。
@@ -153,3 +153,11 @@ Milestone 2で、ファイルとテキスト貼付けの両方を同じ`parseAnd
 `bet_candidates[]`の`hit_probability`、`odds`、`odds_observed_at`を使い、確定予想の表示時に期待値を再計算する。`odds_observed_at`はオッズの観測日時であり、最終オッズの確定状態を表さない。`odds`と観測日時が両方記録済みの場合に「観測時点のオッズ」として計算する。計算結果をインポートJSONの正とはせず、未設定・不正・観測日時のない値は未算出とする。詳細は[`EXPECTED_VALUE.md`](EXPECTED_VALUE.md)を参照する。
 
 現行v1スキーマはオッズ範囲と展開別の馬券条件付き的中確率を持たない。単一値や各馬評価から補完せず、将来のスキーマ版更新まで未算出として扱う。
+
+## 8. Milestone 5での結果確定
+
+結果JSONはプレビューとZod検証後に不変スナップショットとして保存する。同一内容はcontent hashとimport logで二重登録を拒否する。訂正は`result_status=corrected`、`correction_of`、変更理由を持つ新規結果とし、元結果を更新しない。
+
+的中判定は確定払戻表の券種・番号組・100円当たり金額を正とする。着順から払戻を推定せず、券種の払戻行が欠けている場合は不的中ではなく未判定とする。詳しくは[`SETTLEMENTS.md`](SETTLEMENTS.md)を参照する。
+
+初期入力テンプレートは`result_status=draft`かつ着順・払戻・情報源が空で、`source_agent=manual-entry-pending`を持つ。未編集テンプレート、`placeholder.invalid`のURL、`[入力待ち]`の情報源タイトルは確定できない。確定・訂正結果には公式確認した払戻または返還を1件以上入力する。アプリは公式サイトの内容を自動照合しないため、`official_confirmed=true`はユーザーが情報源を確認した事実を表す。

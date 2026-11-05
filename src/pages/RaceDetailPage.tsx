@@ -1,4 +1,4 @@
-import { ArrowLeft, FileInput, Pencil, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, FileInput, Pencil, ReceiptText, ShieldCheck, Trophy } from 'lucide-react'
 import { Link, useParams } from 'react-router-dom'
 import { StatusNotice } from '../components/StatusNotice'
 import { useAuth } from '../features/auth/useAuth'
@@ -71,6 +71,12 @@ export function RaceDetailPage() {
           </Link>
           <Link className="button-secondary" to={`/races/${id}/editor`}>
             <Pencil size={17} /> 下書きを編集
+          </Link>
+          <Link className="button-secondary" to={`/races/${id}/purchases`}>
+            <ReceiptText size={17} /> 実購入を記録
+          </Link>
+          <Link className="button-secondary" to={`/races/${id}/results`}>
+            <Trophy size={17} /> 結果・払戻を登録
           </Link>
         </div>
       </section>

@@ -26,6 +26,16 @@ const PurchasePlansPage = lazy(() =>
     default: module.PurchasePlansPage,
   })),
 )
+const RacePurchasesPage = lazy(() =>
+  import('../pages/RacePurchasesPage').then((module) => ({
+    default: module.RacePurchasesPage,
+  })),
+)
+const RaceResultsPage = lazy(() =>
+  import('../pages/RaceResultsPage').then((module) => ({
+    default: module.RaceResultsPage,
+  })),
+)
 const RaceDetailPage = lazy(() =>
   import('../pages/RaceDetailPage').then((module) => ({ default: module.RaceDetailPage })),
 )
@@ -51,6 +61,8 @@ export function AppRoutes() {
             path="races/:id/predictions/:versionId"
           />
           <Route element={<PurchasePlansPage />} path="races/:id/plans" />
+          <Route element={<RacePurchasesPage />} path="races/:id/purchases" />
+          <Route element={<RaceResultsPage />} path="races/:id/results" />
           <Route element={<PurchasesPage />} path="purchases" />
           <Route element={<AnalyticsPage />} path="analytics" />
           <Route element={<SettingsPage />} path="settings" />

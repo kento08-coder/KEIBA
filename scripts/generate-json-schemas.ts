@@ -33,6 +33,39 @@ for (const entry of schemas) {
     title: entry.title,
     ...jsonSchema,
   }
+  if (entry.fileName === 'result.schema.json') {
+    Object.assign(output, {
+      allOf: [
+        {
+          if: {
+            properties: {
+              result_status: { enum: ['confirmed', 'corrected'] },
+            },
+            required: ['result_status'],
+          },
+          then: {
+            properties: {
+              payouts: { minItems: 1 },
+              source_agent: { not: { const: 'manual-entry-pending' } },
+              sources: {
+                items: {
+                  properties: {
+                    title: { not: { pattern: '\\[入力待ち\\]' } },
+                    url: {
+                      not: {
+                        pattern: '^https://placeholder\\.invalid(?:/|$)',
+                      },
+                    },
+                  },
+                },
+                minItems: 1,
+              },
+            },
+          },
+        },
+      ],
+    })
+  }
 
   await writeFile(
     path.join(outputDirectory, entry.fileName),

@@ -2,7 +2,7 @@
 
 - 対象: Phase 1 MVP
 - スキーマ版: `1.0.0`
-- 更新日: 2026-11-05
+- 更新日: 2026-11-06
 - 要件ソース: [`REQUIREMENTS.md`](REQUIREMENTS.md)
 
 ## 1. 設計原則
@@ -49,6 +49,10 @@
 | `distanceM` | integer | 距離（m） |
 | `status` | enum | `registered` / `predicting` / `prediction_confirmed` / `purchased` / `result_recorded` |
 | `latestPredictionVersionId` | string \| null | 最新確定予想への参照 |
+| `latestPurchaseId` | string \| null | 直近の購入確定・訂正。Rulesで集約更新と購入ドキュメントを突合 |
+| `latestResultId` | string \| null | 最新確定結果への参照 |
+| `activePurchaseIds` | string[] | 現在有効な購入記録ID。最大500件 |
+| `purchaseRevision` | non-negative integer | 購入確定・訂正ごとに+1。結果確定時の競合検知に使用 |
 | `resultStatus` | enum | `none` / `draft` / `confirmed` |
 | `createdAt` | Timestamp | 作成日時 |
 | `updatedAt` | Timestamp | 更新日時 |
@@ -112,7 +116,7 @@
 
 ### 3.5 `/purchases/{purchaseId}`
 
-実購入の記録。外部馬券購入処理ではない。Milestone 5で実装する。
+実購入の記録。外部馬券購入処理ではない。詳細は[`SETTLEMENTS.md`](SETTLEMENTS.md)を参照する。
 
 - `sourcePlanId?`
 - `sourcePredictionVersionId`
@@ -123,12 +127,14 @@
 - `totalStakeYen`
 - `idempotencyKey`
 - `correctionOf?`
+- `rootPurchaseId` / `correctionSequence`: 訂正チェーンと有効版の選択
+- `revision`: draftの競合検知
 
 提案内容を直接変更せず、実購入は独立スナップショットとして保存する。確定後の訂正は`correctionOf`を持つ新規レコードにする。
 
 ### 3.6 `/results/{resultId}`
 
-結果JSONとアプリ内編集結果を保存する。Milestone 5で実装する。
+結果JSONとアプリ内編集結果を保存する。
 
 - `status`: `draft` / `confirmed` / `corrected`
 - `payload`: ResultDocument
@@ -136,14 +142,16 @@
 - `importId`
 - `createdAt`
 - `updatedAt`
+- `resultId` / `rootResultId` / `correctionOf` / `correctionSequence`
+- `activePurchaseIds` / `purchaseRevision`: 結果計算に使用した購入集合のスナップショット
 
 観測事実（着順・公式払戻・通過順）と解釈（展開評価）を`payload`内で分離する。
 
 ### 3.7 `/bankrollTransactions/{transactionId}`
 
-Phase 2で本格実装する台帳。Phase 1では購入・払戻の一貫性を保つための参照設計だけを維持する。
+Phase 2で本格実装する台帳。Phase 1では購入・払戻・訂正差額をtransactionで記録する。
 
-- `kind`: `deposit` / `withdrawal` / `stake` / `payout` / `adjustment`
+- `kind`: Phase 1では`stake` / `payout` / `adjustment`
 - `amountYen`
 - `referenceId`
 - `idempotencyKey`

@@ -132,6 +132,12 @@ export function PurchasePlansPage() {
               <p className="mt-3 text-xs text-muted">
                 保存: {formatTimestamp(plan.createdAt)}
               </p>
+              <Link
+                className="button-primary mt-4"
+                to={`/races/${id}/purchases?planId=${encodeURIComponent(plan.planId)}`}
+              >
+                このプランから実購入を記録
+              </Link>
             </article>
           ))}
         </div>
