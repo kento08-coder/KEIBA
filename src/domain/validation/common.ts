@@ -127,7 +127,10 @@ export function validateBetSelections(
     })
   }
 
-  if (new Set(selections).size !== selections.length) {
+  if (
+    !isFrameBet(betType) &&
+    new Set(selections).size !== selections.length
+  ) {
     context.addIssue({
       code: 'custom',
       path: ['horse_numbers'],
@@ -135,7 +138,10 @@ export function validateBetSelections(
     })
   }
 
-  if (isFrameBet(betType) && selections.some((selection) => selection > 8)) {
+  if (
+    isFrameBet(betType) &&
+    selections.some((selection) => selection < 1 || selection > 8)
+  ) {
     context.addIssue({
       code: 'custom',
       path: ['horse_numbers'],
@@ -143,14 +149,21 @@ export function validateBetSelections(
     })
   }
 
-  if (
-    unorderedBetTypes.has(betType) &&
-    selections.some((selection, index) => index > 0 && selection <= selections[index - 1]!)
-  ) {
+  const hasInvalidUnorderedSequence = selections.some(
+    (selection, index) =>
+      index > 0 &&
+      (isFrameBet(betType)
+        ? selection < selections[index - 1]!
+        : selection <= selections[index - 1]!),
+  )
+
+  if (unorderedBetTypes.has(betType) && hasInvalidUnorderedSequence) {
     context.addIssue({
       code: 'custom',
       path: ['horse_numbers'],
-      message: '順不同券種の番号は重複なしの昇順で指定してください。',
+      message: isFrameBet(betType)
+        ? '枠連の枠番は昇順で指定してください。ゾロ目だけ同じ枠番を指定できます。'
+        : '順不同券種の番号は重複なしの昇順で指定してください。',
     })
   }
 }

@@ -16,10 +16,10 @@
   "notes": "この結果はスキーマ検証用の架空サンプルです。実在するレース・競走馬・払戻ではありません。",
   "result_status": "confirmed",
   "finishers": [
-    { "horse_number": 2, "rank": 1, "status": "finished" },
-    { "horse_number": 7, "rank": 2, "status": "finished" },
-    { "horse_number": 10, "rank": 3, "status": "finished" },
-    { "horse_number": 1, "rank": 4, "status": "finished" }
+    { "horse_number": 2, "frame_number": 1, "rank": 1, "status": "finished" },
+    { "horse_number": 7, "frame_number": 1, "rank": 2, "status": "finished" },
+    { "horse_number": 10, "frame_number": 6, "rank": 3, "status": "finished" },
+    { "horse_number": 1, "frame_number": 8, "rank": 4, "status": "finished" }
   ],
   "payouts": [
     { "bet_type": "win", "horse_numbers": [2], "payout_type": "payout", "payout_per_100_yen": 480, "official_confirmed": true, "source_refs": ["sample-official-result"] },

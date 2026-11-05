@@ -11,6 +11,7 @@ import {
 export const FinisherSchema = z
   .object({
     horse_number: z.number().int().min(1).max(99),
+    frame_number: z.number().int().min(1).max(8),
     rank: z.number().int().positive().max(99).nullable(),
     status: z.enum([
       'finished',
@@ -129,6 +130,18 @@ export const ResultDocumentSchema = z
     const finisherNumbers = new Set(
       result.finishers.map((finisher) => finisher.horse_number),
     )
+    const frameRunnerCounts = result.finishers.reduce<Map<number, number>>(
+      (counts, finisher) => {
+        if (finisher.status !== 'scratched' && finisher.status !== 'excluded') {
+          counts.set(
+            finisher.frame_number,
+            (counts.get(finisher.frame_number) ?? 0) + 1,
+          )
+        }
+        return counts
+      },
+      new Map(),
+    )
     result.observed_pace.passing_orders.forEach((order, orderIndex) => {
       order.horse_numbers.forEach((horseNumber, horseIndex) => {
         if (!finisherNumbers.has(horseNumber)) {
@@ -164,8 +177,29 @@ export const ResultDocumentSchema = z
 
     result.payouts.forEach((payout, payoutIndex) => {
       if (isFrameBet(payout.bet_type)) {
+        payout.horse_numbers.forEach((frameNumber, frameIndex) => {
+          if (!frameRunnerCounts.has(frameNumber)) {
+            context.addIssue({
+              code: 'custom',
+              path: ['payouts', payoutIndex, 'horse_numbers', frameIndex],
+              message: '実際の出走馬に存在しない枠番です。',
+            })
+          }
+        })
+        if (
+          payout.horse_numbers.length === 2 &&
+          payout.horse_numbers[0] === payout.horse_numbers[1] &&
+          (frameRunnerCounts.get(payout.horse_numbers[0]!) ?? 0) < 2
+        ) {
+          context.addIssue({
+            code: 'custom',
+            path: ['payouts', payoutIndex, 'horse_numbers'],
+            message: '枠連のゾロ目は同じ枠に実際の出走馬が2頭以上いる場合だけ指定できます。',
+          })
+        }
         return
       }
+
       payout.horse_numbers.forEach((horseNumber, horseIndex) => {
         if (!finisherNumbers.has(horseNumber)) {
           context.addIssue({
@@ -175,6 +209,9 @@ export const ResultDocumentSchema = z
           })
         }
       })
+    })
+
+    result.payouts.forEach((payout, payoutIndex) => {
       payout.source_refs?.forEach((sourceRef, sourceIndex) => {
         if (!sourceReferences.has(sourceRef)) {
           context.addIssue({

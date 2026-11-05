@@ -16,6 +16,7 @@ interface PredictionFixture {
     source_refs?: string[]
   }>
   horses: Array<{
+    frame_number: number
     horse_number: number
     probabilities: {
       top2: number | null
@@ -30,6 +31,7 @@ interface PredictionFixture {
 interface ResultFixture {
   correction_of?: string
   finishers: Array<{
+    frame_number: number
     horse_number: number
     rank: number | null
     status: string
@@ -146,6 +148,65 @@ describe('prediction import validation', () => {
     expect(validateImportDocument(input).success).toBe(false)
   })
 
+  it('accepts a bracket quinella same-frame selection when two horses share the frame', () => {
+    const input = clone(predictionSample)
+    input.horses[1]!.frame_number = input.horses[0]!.frame_number
+    const bracketQuinella = input.bet_candidates.find(
+      (candidate) => candidate.bet_type === 'bracket_quinella',
+    )
+    expect(bracketQuinella).toBeDefined()
+    bracketQuinella!.horse_numbers = [1, 1]
+
+    expect(validateImportDocument(input).success).toBe(true)
+  })
+
+  it('rejects a bracket quinella same-frame selection when only one horse uses the frame', () => {
+    const input = clone(predictionSample)
+    const bracketQuinella = input.bet_candidates.find(
+      (candidate) => candidate.bet_type === 'bracket_quinella',
+    )
+    expect(bracketQuinella).toBeDefined()
+    bracketQuinella!.horse_numbers = [1, 1]
+
+    expect(validateImportDocument(input).success).toBe(false)
+  })
+
+  it('rejects bracket quinella frame numbers outside 1 through 8', () => {
+    const input = clone(predictionSample)
+    const bracketQuinella = input.bet_candidates.find(
+      (candidate) => candidate.bet_type === 'bracket_quinella',
+    )
+    expect(bracketQuinella).toBeDefined()
+    bracketQuinella!.horse_numbers = [1, 9]
+
+    expect(validateImportDocument(input).success).toBe(false)
+  })
+
+  it('continues to reject duplicate horse numbers for quinella', () => {
+    const input = clone(predictionSample)
+    const quinella = input.bet_candidates.find(
+      (candidate) => candidate.bet_type === 'quinella',
+    )
+    expect(quinella).toBeDefined()
+    quinella!.horse_numbers = [2, 2]
+
+    expect(validateImportDocument(input).success).toBe(false)
+  })
+
+  it('accepts official minimum odds of 1.0', () => {
+    const input = clone(predictionSample)
+    input.bet_candidates[0]!.odds = 1
+
+    expect(validateImportDocument(input).success).toBe(true)
+  })
+
+  it('rejects odds below 1.0', () => {
+    const input = clone(predictionSample)
+    input.bet_candidates[0]!.odds = 0.9
+
+    expect(validateImportDocument(input).success).toBe(false)
+  })
+
   it('rejects a bet selection that is not in the race', () => {
     const input = clone(predictionSample)
     input.bet_candidates[0]!.horse_numbers = [99]
@@ -214,6 +275,59 @@ describe('result import validation', () => {
     input.payouts[0]!.source_refs = ['missing-source']
 
     expect(validateImportDocument(input).success).toBe(false)
+  })
+
+  it('accepts a bracket quinella same-frame payout when two runners share the frame', () => {
+    const input = clone(resultSample)
+    input.payouts.push({
+      bet_type: 'bracket_quinella',
+      horse_numbers: [1, 1],
+      official_confirmed: true,
+      payout_per_100_yen: 720,
+      payout_type: 'payout',
+      source_refs: ['sample-official-result'],
+    })
+
+    expect(validateImportDocument(input).success).toBe(true)
+  })
+
+  it('rejects a bracket quinella same-frame payout when only one runner uses the frame', () => {
+    const input = clone(resultSample)
+    input.finishers[1]!.frame_number = 4
+    input.payouts.push({
+      bet_type: 'bracket_quinella',
+      horse_numbers: [1, 1],
+      official_confirmed: true,
+      payout_per_100_yen: 720,
+      payout_type: 'payout',
+      source_refs: ['sample-official-result'],
+    })
+
+    expect(validateImportDocument(input).success).toBe(false)
+  })
+
+  it('validates source references for bracket quinella payouts', () => {
+    const input = clone(resultSample)
+    input.payouts.push({
+      bet_type: 'bracket_quinella',
+      horse_numbers: [1, 1],
+      official_confirmed: true,
+      payout_per_100_yen: 720,
+      payout_type: 'payout',
+      source_refs: ['missing-source'],
+    })
+
+    const result = validateImportDocument(input)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.errors).toContainEqual(
+        expect.objectContaining({
+          message: 'sourcesに存在しない出典参照です。',
+          path: '$.payouts.5.source_refs.0',
+        }),
+      )
+    }
   })
 
   it('requires correction_of for a corrected result', () => {

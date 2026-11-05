@@ -121,7 +121,7 @@ export const BetCandidateSchema = z
     id: z.string().trim().regex(/^[A-Za-z0-9_-]+$/).min(1).max(80),
     bet_type: BetTypeSchema,
     horse_numbers: z.array(z.number().int().min(1).max(99)).max(3),
-    odds: z.number().finite().gt(1).nullable(),
+    odds: z.number().finite().min(1).nullable(),
     odds_observed_at: DateTimeWithOffsetSchema.nullable(),
     hit_probability: nullableProbability,
     probability_source: z.enum([
@@ -261,6 +261,13 @@ export const PredictionDocumentSchema = z
     const frameNumbers = new Set(
       prediction.horses.map((horse) => horse.frame_number),
     )
+    const frameRunnerCounts = prediction.horses.reduce<Map<number, number>>(
+      (counts, horse) => {
+        counts.set(horse.frame_number, (counts.get(horse.frame_number) ?? 0) + 1)
+        return counts
+      },
+      new Map(),
+    )
 
     prediction.horses.forEach((horse, horseIndex) => {
       for (const scenarioId of Object.keys(horse.scenario_assessments)) {
@@ -321,6 +328,18 @@ export const PredictionDocumentSchema = z
           })
         }
       })
+      if (
+        isFrameBet(candidate.bet_type) &&
+        candidate.horse_numbers.length === 2 &&
+        candidate.horse_numbers[0] === candidate.horse_numbers[1] &&
+        (frameRunnerCounts.get(candidate.horse_numbers[0]!) ?? 0) < 2
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['bet_candidates', candidateIndex, 'horse_numbers'],
+          message: '枠連のゾロ目は同じ枠に出走馬が2頭以上いる場合だけ指定できます。',
+        })
+      }
       candidate.source_refs?.forEach((sourceRef, sourceIndex) => {
         if (!sourceReferences.has(sourceRef)) {
           context.addIssue({
