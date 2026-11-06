@@ -195,7 +195,7 @@ function Filters({
         <label className="field-label">主催者<select aria-label="主催者" className="field-input" value={filters.organizer} onChange={(event) => set('organizer', event.target.value)}><option value="all">すべて</option>{organizers.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
         <label className="field-label">競馬場<select aria-label="競馬場" className="field-input" value={filters.venueCode} onChange={(event) => set('venueCode', event.target.value)}><option value="all">すべて</option>{venues.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
         <label className="field-label">券種<select aria-label="券種" className="field-input" value={filters.betType} onChange={(event) => set('betType', event.target.value as DashboardFilters['betType'])}><option value="all">すべて</option>{dashboardBetTypes.map((value) => <option key={value} value={value}>{betTypeLabels[value]}</option>)}</select></label>
-        <label className="field-label">結果状態<select aria-label="結果状態" className="field-input" value={filters.result} onChange={(event) => set('result', event.target.value as DashboardFilters['result'])}><option value="all">すべて</option><option value="confirmed">判定済み</option><option value="unconfirmed">未判定</option></select></label>
+        <label className="field-label">結果状態<select aria-label="結果状態" className="field-input" value={filters.result} onChange={(event) => set('result', event.target.value as DashboardFilters['result'])}><option value="all">すべて</option><option value="confirmed">結果確定</option><option value="unconfirmed">結果未確定</option></select></label>
         <label className="field-label">購入プラン<select aria-label="購入プラン" className="field-input" value={filters.plan} onChange={(event) => set('plan', event.target.value as DashboardFilters['plan'])}><option value="all">すべて</option><option value="with_plan">あり</option><option value="without_plan">なし</option></select></label>
       </div>
     </section>
@@ -266,6 +266,18 @@ export function DashboardView({ source }: { source: DashboardSource }) {
         <p className="eyebrow">Calibration</p><h2 className="mt-1 text-xl font-bold text-white">予想的中確率の精度</h2>
         <p className="mt-2 text-sm text-muted">Brier Score: {analysis.calibration.brierScore === null ? '未算出' : analysis.calibration.brierScore.toFixed(4)}／対象候補 {analysis.calibration.sampleCount}件</p>
         <p className="mt-1 text-xs leading-5 text-muted">同一候補の重複購入 {analysis.calibration.duplicateCandidateCount}件と、予想確定が購入前と確認できない {analysis.calibration.excludedChronologyCount}件を除外。少数データでは精度を断定できません。</p>
+        <div aria-label="確率帯別の平均推定確率と実際の的中率" className="mt-4 space-y-3">
+          {analysis.calibration.bands.map((band) => (
+            <div key={band.label} className="grid grid-cols-[5rem_1fr] items-center gap-3 text-xs">
+              <span>{band.label}</span>
+              <div className="space-y-1">
+                <div className="h-2 rounded bg-navy-950"><div className="h-2 rounded bg-teal-accent" style={{ width: `${(band.averageProbability ?? 0) * 100}%` }} /></div>
+                <div className="h-2 rounded bg-navy-950"><div className="h-2 rounded bg-sky-400" style={{ width: `${(band.actualHitRate ?? 0) * 100}%` }} /></div>
+              </div>
+            </div>
+          ))}
+          <p className="text-xs text-muted">上段: 平均推定確率／下段: 実際の的中率（数値と件数は以下）</p>
+        </div>
         <div className="mt-5 grid gap-3 sm:grid-cols-5">{analysis.calibration.bands.map((band) => <article className="rounded-xl border border-slate-line bg-navy-950/45 p-3" key={band.label}><p className="text-xs font-bold text-teal-accent">{band.label}</p><p className="mt-2 text-lg font-bold text-white">{band.count}件</p><p className="mt-2 text-xs text-muted">平均推定 {band.averageProbability === null ? '—' : formatPercent(band.averageProbability * 100)}</p><p className="text-xs text-muted">実際的中 {band.actualHitRate === null ? '—' : formatPercent(band.actualHitRate * 100)}</p><p className="text-xs text-muted">差 {band.difference === null ? '—' : formatPercent(band.difference * 100)}</p></article>)}</div>
       </section>
 
