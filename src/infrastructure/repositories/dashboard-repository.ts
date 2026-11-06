@@ -2,6 +2,7 @@ import {
   collection,
   limit,
   onSnapshot,
+  onSnapshotsInSync,
   orderBy,
   query,
   type Timestamp,
@@ -52,13 +53,14 @@ export function subscribeDashboard(
   let truncated = false
   let stopped = false
 
-  const emit = () => {
+  const emit = (syncPending = true) => {
     if (
       stopped ||
       !ledgerReady ||
       orderedRaceIds.some((raceId) => entries.get(raceId)?.ready.size !== 4)
     ) return
     onData({
+      syncPending,
       ledgerTransactions: ledger,
       races: orderedRaceIds.flatMap((raceId) => {
         const entry = entries.get(raceId)
@@ -180,7 +182,9 @@ export function subscribeDashboard(
     fail,
   )
 
+  const syncUnsubscribe = onSnapshotsInSync(db, () => emit(false))
   return () => {
+    syncUnsubscribe()
     stopped = true
     raceUnsubscribe()
     ledgerUnsubscribe()

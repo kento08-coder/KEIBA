@@ -94,6 +94,16 @@ function latestResult(source: DashboardRaceSource) {
     : selectEffectiveResult(source.results)
 }
 
+export function isStrictPreRacePrediction(source: DashboardRaceSource, confirmedAt: unknown) {
+  const evidence = source.raceStartEvidence
+  const start = evidence?.verified && /^https:\/\//.test(evidence.sourceUrl)
+    ? toMillis(evidence.actualStartedAt)
+    : null
+  const confirmed = toMillis(confirmedAt)
+  // A purchase time or an app result-save time cannot prove the actual race start.
+  return start !== null && confirmed !== null && confirmed < start
+}
+
 function buildRows(source: DashboardRaceSource): DashboardTicketRow[] {
   const result = latestResult(source)
   const activeIds = new Set(source.race.activePurchaseIds ?? [])
@@ -108,12 +118,19 @@ function buildRows(source: DashboardRaceSource): DashboardTicketRow[] {
       const snapshot = sourceSnapshot(source, purchase, item.sourceCandidateId)
       const confirmedAt = toMillis(snapshot?.referenceAt)
       const placedAt = toMillis(purchase.placedAt)
+      const version = source.predictionVersions.find(
+        (entry) => entry.id === purchase.sourcePredictionVersionId,
+      )
       const predictionWasPreRace =
+        isStrictPreRacePrediction(source, version?.confirmedAt) &&
+        isStrictPreRacePrediction(source, snapshot?.referenceAt) &&
+        confirmedAt !== null && placedAt !== null && confirmedAt <= placedAt
+      const snapshotPredatesPurchase =
         confirmedAt !== null && placedAt !== null && confirmedAt <= placedAt
       const evaluation = calculateExpectedValue({
-        odds: predictionWasPreRace ? (snapshot?.odds ?? null) : null,
-        oddsObserved: predictionWasPreRace && Boolean(snapshot?.oddsObservedAt),
-        probability: predictionWasPreRace ? (snapshot?.hitProbability ?? null) : null,
+        odds: snapshotPredatesPurchase ? (snapshot?.odds ?? null) : null,
+        oddsObserved: snapshotPredatesPurchase && Boolean(snapshot?.oddsObservedAt),
+        probability: snapshotPredatesPurchase ? (snapshot?.hitProbability ?? null) : null,
         stakeYen: item.stakeYen,
       })
       return {
@@ -350,8 +367,7 @@ function scenarioReviews(
             (entry) => entry.id === purchase.sourcePredictionVersionId,
           )
           const confirmedAt = toMillis(version?.confirmedAt)
-          const placedAt = toMillis(purchase.placedAt)
-          return confirmedAt !== null && placedAt !== null && confirmedAt <= placedAt
+          return isStrictPreRacePrediction(source, confirmedAt === null ? null : version?.confirmedAt)
             ? purchase.sourcePredictionVersionId
             : null
         })
@@ -422,6 +438,7 @@ export function analyzeDashboard(
       purchasedRaceCount: filteredRaceIds.size,
     },
     ledger: {
+      status: !ledgerComparable ? 'excluded' : source.syncPending ? 'syncing' : ledgerNetCashYen === derivedNetCashYen ? 'matched' : 'difference',
       comparable: ledgerComparable,
       derivedNetCashYen,
       differenceYen: ledgerNetCashYen - derivedNetCashYen,

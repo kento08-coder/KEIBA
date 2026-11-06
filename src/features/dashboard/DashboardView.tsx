@@ -248,7 +248,11 @@ export function DashboardView({ source }: { source: DashboardSource }) {
       <section className="card-surface p-4 sm:p-5">
         <div className="flex items-start gap-3">
           {analysis.ledger.comparable && analysis.ledger.matches ? <CheckCircle2 className="mt-0.5 text-emerald-300" size={20} /> : <AlertTriangle className="mt-0.5 text-amber-300" size={20} />}
-          <div><h2 className="font-bold text-white">収支台帳との整合性</h2>{analysis.ledger.comparable ? <p className="mt-1 text-sm text-muted">台帳 {formatYen(analysis.ledger.ledgerNetCashYen)}／有効購入・最新結果 {formatYen(analysis.ledger.derivedNetCashYen)}／差額 {formatYen(analysis.ledger.differenceYen)}（{analysis.ledger.transactionCount}取引）</p> : <p className="mt-1 text-sm text-muted">券種・結果状態・プランで明細を絞り込んでいるため、レース単位の台帳とは比較しません。全明細に戻すと照合できます。</p>}</div>
+          <div><h2 className="font-bold text-white">収支台帳との整合性</h2>
+            <p className="mt-1 text-sm text-muted">{{ excluded: '照合対象外：券種・プランで一部明細を抽出しています。', syncing: '同期中：各購読の反映確認を待っています。', matched: '照合一致', difference: '差額あり：購読更新の一時差の可能性もあります。再読み込み後も続く場合は記録を確認してください。' }[analysis.ledger.status]}</p>
+            {analysis.ledger.comparable ? <p className="mt-1 text-sm text-muted">台帳 {formatYen(analysis.ledger.ledgerNetCashYen)}／有効購入・最新結果 {formatYen(analysis.ledger.derivedNetCashYen)}／差額 {formatYen(analysis.ledger.differenceYen)}（{analysis.ledger.transactionCount}取引）</p> : null}
+            <p className="mt-1 text-xs text-muted">最新200レース内の対象レース全体を照合。期間・主催者・競馬場・結果確定状態はレース単位の絞り込みです。</p>
+          </div>
         </div>
       </section>
 
@@ -265,7 +269,7 @@ export function DashboardView({ source }: { source: DashboardSource }) {
       <section className="card-surface p-4 sm:p-5">
         <p className="eyebrow">Calibration</p><h2 className="mt-1 text-xl font-bold text-white">予想的中確率の精度</h2>
         <p className="mt-2 text-sm text-muted">Brier Score: {analysis.calibration.brierScore === null ? '未算出' : analysis.calibration.brierScore.toFixed(4)}／対象候補 {analysis.calibration.sampleCount}件</p>
-        <p className="mt-1 text-xs leading-5 text-muted">同一候補の重複購入 {analysis.calibration.duplicateCandidateCount}件と、予想確定が購入前と確認できない {analysis.calibration.excludedChronologyCount}件を除外。少数データでは精度を断定できません。</p>
+        <p className="mt-1 text-xs leading-5 text-muted">同一候補の重複購入 {analysis.calibration.duplicateCandidateCount}件と、確認済み実開始時刻より前の予想確定を検証できない {analysis.calibration.excludedChronologyCount}件を除外。開始時刻不明の既存データは厳密集計の対象外です。少数データでは精度を断定できません。</p>
         <div aria-label="確率帯別の平均推定確率と実際の的中率" className="mt-4 space-y-3">
           {analysis.calibration.bands.map((band) => (
             <div key={band.label} className="grid grid-cols-[5rem_1fr] items-center gap-3 text-xs">

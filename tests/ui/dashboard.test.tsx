@@ -5,6 +5,13 @@ import { DashboardView } from '../../src/features/dashboard/DashboardView'
 import { makeDashboardSource, mergeDashboardSources } from '../helpers/dashboard-fixture'
 
 describe('DashboardView', () => {
+  it('同期中と開始時刻不足の説明を表示する', () => {
+    const source = makeDashboardSource()
+    delete source.races[0]!.raceStartEvidence
+    render(<DashboardView source={{ ...source, syncPending: true }} />)
+    expect(screen.getByText(/同期中：/)).toBeInTheDocument()
+    expect(screen.getByText(/開始時刻不明の既存データ/)).toBeInTheDocument()
+  })
   it('フィルター切替でKPIと表を同じ条件へ更新する', async () => {
     const user = userEvent.setup()
     const source = mergeDashboardSources(

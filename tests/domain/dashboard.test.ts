@@ -9,6 +9,30 @@ import { dashboardBetTypes } from '../../src/domain/types/dashboard'
 import { makeDashboardSource, mergeDashboardSources } from '../helpers/dashboard-fixture'
 
 describe('dashboard analytics', () => {
+  it.each(['before', 'after', 'late_purchase', 'unknown_start', 'unknown_prediction'] as const)(
+    '厳密な時系列検証: %s', (kind) => {
+      const source = makeDashboardSource()
+      const race = source.races[0]!
+      if (kind === 'after' || kind === 'late_purchase') {
+        race.predictionVersions[0]!.confirmedAt = '2026-11-02T07:00:00+09:00'
+      }
+      if (kind === 'late_purchase') race.purchases[0]!.placedAt = '2026-11-03T09:00:00+09:00'
+      if (kind === 'unknown_start') delete race.raceStartEvidence
+      if (kind === 'unknown_prediction') race.predictionVersions[0]!.confirmedAt = ''
+      const calibration = analyzeDashboard(source).calibration
+      expect(calibration.sampleCount).toBe(kind === 'before' ? 1 : 0)
+      if (kind !== 'before') expect(calibration.brierScore).toBeNull()
+    },
+  )
+
+  it('券種・プラン抽出は照合対象外、結果状態はレース全体として照合する', () => {
+    const source = makeDashboardSource()
+    expect(analyzeDashboard(source, { ...emptyDashboardFilters, betType: 'win' }).ledger.status).toBe('excluded')
+    expect(analyzeDashboard(source, { ...emptyDashboardFilters, plan: 'with_plan' }).ledger.status).toBe('excluded')
+    expect(analyzeDashboard(source, { ...emptyDashboardFilters, result: 'confirmed' }).ledger.status).toBe('matched')
+    expect(analyzeDashboard({ ...source, syncPending: true }).ledger.status).toBe('syncing')
+  })
+
   it('購入1件の的中、払戻、損益、回収率を集計する', () => {
     const result = analyzeDashboard(makeDashboardSource(), emptyDashboardFilters)
     expect(result.kpi).toMatchObject({

@@ -21,6 +21,8 @@ export const dashboardBetTypes: BetType[] = [
 ]
 
 export interface DashboardRaceSource<TTimestamp = unknown> {
+  /** Optional trusted timing adapter; never infer this from the race date. */
+  raceStartEvidence?: { actualStartedAt: string; sourceUrl: string; verified: true }
   plans: Array<PurchasePlanRecord<TTimestamp>>
   predictionVersions: Array<PredictionVersionRecord<TTimestamp> & { id: string }>
   purchases: Array<PurchaseRecord<TTimestamp>>
@@ -29,6 +31,7 @@ export interface DashboardRaceSource<TTimestamp = unknown> {
 }
 
 export interface DashboardSource<TTimestamp = unknown> {
+  syncPending?: boolean
   ledgerTransactions: Array<BankrollTransactionRecord<TTimestamp>>
   races: Array<DashboardRaceSource<TTimestamp>>
   truncated: boolean
@@ -147,6 +150,7 @@ export interface ScenarioReview {
 }
 
 export interface LedgerReconciliation {
+  status: 'excluded' | 'syncing' | 'matched' | 'difference'
   comparable: boolean
   derivedNetCashYen: number
   differenceYen: number

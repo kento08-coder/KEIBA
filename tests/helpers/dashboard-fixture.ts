@@ -195,6 +195,7 @@ export function makeDashboardSource(
   return {
     ledgerTransactions: [ledger],
     races: [{
+      raceStartEvidence: { actualStartedAt: `${date}T15:00:00+09:00`, sourceUrl: 'https://www.jra.go.jp/', verified: true },
       plans: includePlan ? [plan] : [],
       predictionVersions: [version],
       purchases: [purchase],
