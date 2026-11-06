@@ -2,13 +2,15 @@
 
 競馬の予想・購入記録・結果分析を一貫して管理するための、個人向けWebアプリです。
 
-**Phase 0（開発基盤）** と **Phase 1 Milestone 1〜4（データモデル・レース／予想管理・期待値計算・購入プラン）** までを実装しています。画面上の成績と`examples/`のJSONは検証用の架空サンプルであり、実在するレースや購入記録ではありません。実購入記録と結果分析は後続マイルストーンで実装します。
+**Phase 0（開発基盤）** と **Phase 1 Milestone 1〜6（データモデルから成績分析まで）** を実装しています。`examples/`のJSONは検証用の架空サンプルであり、実在するレースや購入記録ではありません。
 
 Milestone 2では、レース登録、予想JSONのファイル／貼り付け取込、Zod検証プレビュー、詳細分析編集、下書き自動保存、競合検知、確定予想バージョン、差分表示を追加しています。既存下書きの置換前には差分と確認操作を表示し、最新確定版から予想内容が変わっていない再確定は拒否します。クラウド機能はGoogleログイン後に有効になります。
 
 Milestone 3では、全8券種の期待回収率・期待払戻金・期待純利益・損益分岐確率・推定確率優位幅を純粋関数で計算し、確定予想画面で比較できます。未確認値は補完せず、AI推定に基づく参考値であって購入推奨や利益保証ではないことを明示します。
 
 Milestone 4では、期待値重視・保守的ケリー参考・損失抑制の3方式を予算内で比較し、100円単位、点数上限、1点上限を守って提案します。手動調整後のプランは確率・観測時点オッズ・計算結果を含むcreate-onlyスナップショットとしてFirestoreへ保存します。実際の馬券購入は行いません。
+
+Milestone 5では、実購入、訂正履歴、公式払戻表、結果訂正、払戻・返還・損益、収支台帳を不変スナップショットとtransactionで管理します。Milestone 6では、有効購入と最新結果だけを用いたKPI、累積収支、全8券種・主催者・競馬場別分析、期待値実績比較、確率較正、Brier Score、展開予想の振り返りを追加しています。
 
 ## 技術構成
 
@@ -167,6 +169,7 @@ tests/rules/                 # Firestore Security Rulesテスト
 - [`docs/EXPECTED_VALUE.md`](docs/EXPECTED_VALUE.md): 期待値・展開加重計算仕様
 - [`docs/PURCHASE_PLANS.md`](docs/PURCHASE_PLANS.md): 3方式の資金配分・保存仕様
 - [`docs/SETTLEMENTS.md`](docs/SETTLEMENTS.md): 実購入、結果、訂正履歴、払戻・収支計算
+- [`docs/DASHBOARD.md`](docs/DASHBOARD.md): KPI、収支推移、確率較正、Firestore集計仕様
 - [`docs/SECURITY_AUDIT.md`](docs/SECURITY_AUDIT.md): 依存関係とActionsの確認結果
 - [`schemas/`](schemas/): 生成JSON Schema
 - [`examples/`](examples/): 架空テンプレートとサンプル
